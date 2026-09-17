@@ -1,0 +1,23 @@
+data/
+__pycache__/
+*.pyc
+test-data/
+.runtime/
+
+# Runtime logs and diagnostics
+*.log
+
+# Local credentials and environment overrides
+.env
+.env.*
+nocobase-config.json
+**/nocobase-config.json
+*.storage-state.json
+*.auth.json
+playwright/.auth/
+
+# Editor and operating-system metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

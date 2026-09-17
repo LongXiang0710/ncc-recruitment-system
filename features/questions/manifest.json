@@ -1,0 +1,8 @@
+{
+  "name": "questions",
+  "label": "常见问题",
+  "order": 60,
+  "dependencies": [
+    "candidates"
+  ]
+}

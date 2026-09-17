@@ -1,0 +1,104 @@
+{
+  "title": "院校基础库",
+  "short": "院校",
+  "description": "管理院校信息、业务开发负责人和就业网账号",
+  "fields": [
+    {
+      "key": "name",
+      "label": "学校名称",
+      "required": true
+    },
+    {
+      "key": "region",
+      "label": "所在地区",
+      "options": [
+        "华中",
+        "华东",
+        "华南",
+        "华北",
+        "西北",
+        "东北",
+        "西南"
+      ]
+    },
+    {
+      "key": "business_leader",
+      "label": "业务开发领导"
+    },
+    {
+      "key": "province",
+      "label": "所在省",
+      "required": true
+    },
+    {
+      "key": "city",
+      "label": "所在市"
+    },
+    {
+      "key": "level",
+      "label": "办学层次",
+      "options": [
+        "专科",
+        "本科"
+      ]
+    },
+    {
+      "key": "ownership",
+      "label": "办学形式",
+      "options": [
+        "公办",
+        "民办"
+      ]
+    },
+    {
+      "key": "is_985",
+      "label": "是否985",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "is_211",
+      "label": "是否211",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "is_double_first",
+      "label": "是否双一流",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "employment_account",
+      "label": "就业网账号"
+    },
+    {
+      "key": "employment_password",
+      "label": "就业网密码",
+      "type": "password",
+      "export": false
+    },
+    {
+      "key": "employment_url",
+      "label": "就业网网址",
+      "type": "url"
+    },
+    {
+      "key": "ranking",
+      "label": "院校排名",
+      "type": "integer"
+    },
+    {
+      "key": "province_city",
+      "label": "所在省市",
+      "readonly": true
+    }
+  ]
+}
+

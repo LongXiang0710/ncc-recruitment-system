@@ -1,0 +1,191 @@
+{
+  "title": "人才库",
+  "short": "人才",
+  "description": "集中管理校园招聘与社会招聘人才档案，跟进招聘进度",
+  "fields": [
+    {
+      "key": "recruitment_type",
+      "label": "招聘类型",
+      "options": [
+        "校园招聘",
+        "社会招聘"
+      ]
+    },
+    {
+      "key": "archive_no",
+      "label": "档案编号",
+      "readonly": true
+    },
+    {
+      "key": "created_date",
+      "label": "创建日期",
+      "readonly": true,
+      "virtual": true
+    },
+    {
+      "key": "name",
+      "label": "姓名",
+      "required": true
+    },
+    {
+      "key": "gender",
+      "label": "性别",
+      "options": [
+        "男",
+        "女",
+        "不便透露"
+      ]
+    },
+    {
+      "key": "birthdate",
+      "label": "出生日期",
+      "type": "month"
+    },
+    {
+      "key": "age",
+      "label": "年龄",
+      "type": "number",
+      "min": 1,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "key": "school_name",
+      "label": "毕业院校",
+      "required": true
+    },
+    {
+      "key": "education",
+      "label": "学历",
+      "required": true,
+      "options": [
+        "专科",
+        "本科",
+        "硕士",
+        "博士"
+      ]
+    },
+    {
+      "key": "major",
+      "label": "专业",
+      "required": true
+    },
+    {
+      "key": "graduation",
+      "label": "毕业时间",
+      "type": "month",
+      "readonly": true,
+      "listHidden": true
+    },
+    {
+      "key": "phone",
+      "label": "联系方式",
+      "required": true,
+      "type": "tel"
+    },
+    {
+      "key": "email",
+      "label": "电子邮箱",
+      "type": "email"
+    },
+    {
+      "key": "political_status",
+      "label": "政治面貌",
+      "options": [
+        "群众",
+        "共青团员",
+        "中共预备党员",
+        "中共党员"
+      ]
+    },
+    {
+      "key": "hometown",
+      "label": "籍贯/居住地"
+    },
+    {
+      "key": "channel",
+      "label": "招聘渠道",
+      "options": [
+        "校园线下",
+        "校园平台",
+        "智联招聘",
+        "boss直聘",
+        "化工英才网",
+        "其他"
+      ]
+    },
+    {
+      "key": "channel_detail",
+      "label": "其他渠道详情"
+    },
+    {
+      "key": "resume",
+      "label": "简历附件",
+      "type": "attachment"
+    },
+    {
+      "key": "cohort",
+      "label": "应届",
+      "readonly": true,
+      "virtual": true
+    },
+    {
+      "key": "applied_at",
+      "label": "投递时间",
+      "type": "datetime-local"
+    },
+    {
+      "key": "position",
+      "label": "投递岗位",
+      "options": [
+        "机械工程师",
+        "电气工程师",
+        "安全工程师",
+        "土建工程师",
+        "管道工程师",
+        "设备工程师",
+        "数据分析师",
+        "软件工程师",
+        "财务专员",
+        "其它"
+      ]
+    },
+    {
+      "key": "position_detail",
+      "label": "其它岗位名称",
+      "listHidden": true
+    },
+    {
+      "key": "school_id",
+      "label": "关联院校档案",
+      "ref": "schools",
+      "hidden": true
+    },
+    {
+      "key": "city",
+      "label": "意向工作城市",
+      "hidden": true
+    },
+    {
+      "key": "status",
+      "label": "招聘阶段",
+      "hidden": true,
+      "options": [
+        "待筛选",
+        "待面试",
+        "面试中",
+        "拟录用",
+        "已录用",
+        "已入职",
+        "未通过",
+        "已放弃"
+      ]
+    },
+    {
+      "key": "notes",
+      "label": "内部备注",
+      "type": "textarea",
+      "hidden": true
+    }
+  ]
+}

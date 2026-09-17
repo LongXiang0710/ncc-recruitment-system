@@ -1,0 +1,10 @@
+{
+  "name": "employees",
+  "label": "新员工登记",
+  "order": 50,
+  "dependencies": [
+    "applications",
+    "candidates",
+    "interviews"
+  ]
+}

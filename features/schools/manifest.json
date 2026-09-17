@@ -1,0 +1,6 @@
+{
+  "name": "schools",
+  "label": "院校基础库",
+  "order": 10,
+  "dependencies": []
+}

@@ -1,0 +1,59 @@
+{
+  "title": "应聘人员问题库",
+  "short": "问题",
+  "description": "沉淀应聘咨询、常见问题与答复口径",
+  "fields": [
+    {
+      "key": "question",
+      "label": "问题",
+      "required": true,
+      "type": "textarea"
+    },
+    {
+      "key": "answer",
+      "label": "通用回答话术",
+      "type": "textarea"
+    },
+    {
+      "key": "title",
+      "label": "原问题标题",
+      "hidden": true
+    },
+    {
+      "key": "category",
+      "label": "原问题分类",
+      "hidden": true,
+      "options": [
+        "岗位职责",
+        "薪酬福利",
+        "工作地点",
+        "培养发展",
+        "应聘流程",
+        "专业能力",
+        "其他"
+      ]
+    },
+    {
+      "key": "candidate_id",
+      "label": "原关联应聘人员",
+      "ref": "candidates",
+      "hidden": true
+    },
+    {
+      "key": "owner",
+      "label": "原负责人",
+      "hidden": true
+    },
+    {
+      "key": "status",
+      "label": "原处理状态",
+      "hidden": true,
+      "options": [
+        "待答复",
+        "已答复",
+        "已归档"
+      ]
+    }
+  ]
+}
+

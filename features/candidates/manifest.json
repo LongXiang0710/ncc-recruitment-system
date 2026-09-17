@@ -1,0 +1,8 @@
+{
+  "name": "candidates",
+  "label": "人才库",
+  "order": 20,
+  "dependencies": [
+    "schools"
+  ]
+}

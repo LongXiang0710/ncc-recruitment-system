@@ -1,0 +1,102 @@
+{
+  "title": "简历收集",
+  "short": "简历文件",
+  "description": "集中保存文档或图片简历，预览原文并通过 Dify 工作流识别后录入人才库",
+  "fields": [
+    {
+      "key": "file_hash",
+      "label": "文件指纹",
+      "hidden": true
+    },
+    {
+      "key": "archive_no",
+      "label": "档案编号",
+      "readonly": true
+    },
+    {
+      "key": "source_id",
+      "label": "source_id",
+      "readonly": true,
+      "hidden": true,
+      "export": false
+    },
+    {
+      "key": "status",
+      "label": "处理状态",
+      "options": [
+        "待识别",
+        "已识别",
+        "已入库",
+        "失败"
+      ]
+    },
+    {
+      "key": "name",
+      "label": "简历名称",
+      "required": true
+    },
+    {
+      "key": "position",
+      "label": "应聘岗位",
+      "options": [
+        "机械工程师",
+        "电气工程师",
+        "安全工程师",
+        "土建工程师",
+        "管道工程师",
+        "设备工程师",
+        "数据分析师",
+        "软件工程师",
+        "财务专员",
+        "其它"
+      ]
+    },
+    {
+      "key": "position_detail",
+      "label": "其它岗位名称",
+      "listHidden": true
+    },
+    {
+      "key": "recruitment_type",
+      "label": "招聘类型",
+      "options": [
+        "校园招聘",
+        "社会招聘"
+      ]
+    },
+    {
+      "key": "channel",
+      "label": "招聘渠道",
+      "options": [
+        "校园线下",
+        "校园平台",
+        "智联招聘",
+        "boss直聘",
+        "化工英才网",
+        "其他"
+      ]
+    },
+    {
+      "key": "channel_detail",
+      "label": "其他渠道详情",
+      "listHidden": true
+    },
+    {
+      "key": "resume",
+      "label": "简历附件",
+      "type": "attachment",
+      "accept": ".txt,.md,.mdx,.markdown,.pdf,.html,.xlsx,.xls,.doc,.docx,.csv,.eml,.msg,.pptx,.ppt,.xml,.epub,.jpg,.jpeg,.png,.gif,.webp,.svg"
+    },
+    {
+      "key": "created_by",
+      "label": "创建人",
+      "readonly": true
+    },
+    {
+      "key": "created_date",
+      "label": "上传时间",
+      "readonly": true,
+      "virtual": true
+    }
+  ]
+}

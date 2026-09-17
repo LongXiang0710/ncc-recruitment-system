@@ -1,0 +1,9 @@
+{
+  "name": "interviews",
+  "label": "面试管理",
+  "order": 40,
+  "dependencies": [
+    "applications",
+    "candidates"
+  ]
+}

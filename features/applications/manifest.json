@@ -1,0 +1,8 @@
+{
+  "name": "applications",
+  "label": "校园招聘应聘登记",
+  "order": 30,
+  "dependencies": [
+    "candidates"
+  ]
+}

@@ -1,0 +1,276 @@
+{
+  "title": "校园招聘面试情况表",
+  "short": "面试",
+  "description": "记录个人情况、一面二面评价与面试结果",
+  "fields": [
+    {
+      "key": "archive_no",
+      "label": "档案编号",
+      "readonly": true
+    },
+    {
+      "key": "name",
+      "label": "姓名",
+      "required": true,
+      "section": "基本信息"
+    },
+    {
+      "key": "major",
+      "label": "专业"
+    },
+    {
+      "key": "school_name",
+      "label": "毕业院校",
+      "required": true
+    },
+    {
+      "key": "gender",
+      "label": "性别",
+      "options": [
+        "男",
+        "女",
+        "不便透露"
+      ]
+    },
+    {
+      "key": "hometown",
+      "label": "籍贯"
+    },
+    {
+      "key": "birthdate",
+      "label": "出生日期",
+      "type": "month"
+    },
+    {
+      "key": "age",
+      "label": "年龄",
+      "readonly": true,
+      "virtual": true
+    },
+    {
+      "key": "phone",
+      "label": "联系电话",
+      "type": "tel"
+    },
+    {
+      "key": "first_interview_consent",
+      "label": "是否一面",
+      "options": [
+        "同意",
+        "拒绝",
+        "不合适"
+      ]
+    },
+    {
+      "key": "status",
+      "label": "流程状态",
+      "required": true,
+      "options": [
+        "草稿",
+        "已生效",
+        "进行中",
+        "已取消"
+      ]
+    },
+    {
+      "key": "education",
+      "label": "学历",
+      "options": [
+        "专科",
+        "本科",
+        "硕士",
+        "博士"
+      ]
+    },
+    {
+      "key": "transcript",
+      "label": "成绩单",
+      "type": "attachment",
+      "accept": ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    },
+    {
+      "key": "certificates",
+      "label": "证书附件",
+      "type": "attachment",
+      "accept": ".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    },
+    {
+      "key": "position",
+      "label": "岗位",
+      "options": [
+        "机械工程师",
+        "电气工程师",
+        "安全工程师",
+        "土建工程师",
+        "管道工程师",
+        "设备工程师",
+        "数据分析师",
+        "软件工程师",
+        "财务专员",
+        "其它"
+      ]
+    },
+    {
+      "key": "position_detail",
+      "label": "其它岗位名称",
+      "listHidden": true
+    },
+    {
+      "key": "resume",
+      "label": "简历",
+      "type": "attachment"
+    },
+    {
+      "key": "created_date",
+      "label": "创建日期",
+      "readonly": true,
+      "virtual": true
+    },
+    {
+      "key": "political_status",
+      "label": "政治面貌",
+      "options": [
+        "群众",
+        "共青团员",
+        "中共预备党员",
+        "中共党员"
+      ]
+    },
+    {
+      "key": "identity_card",
+      "label": "身份证"
+    },
+    {
+      "key": "language",
+      "label": "语言能力",
+      "maxLength": 1500
+    },
+    {
+      "key": "interview_at",
+      "label": "面试时间",
+      "type": "datetime-local",
+      "precision": "minutes",
+      "section": "面试与个人情况"
+    },
+    {
+      "key": "is_elite",
+      "label": "是否名校优生",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "personality",
+      "label": "性格",
+      "type": "textarea"
+    },
+    {
+      "key": "family",
+      "label": "家庭情况",
+      "type": "textarea"
+    },
+    {
+      "key": "campus_position",
+      "label": "在校职务"
+    },
+    {
+      "key": "has_internship",
+      "label": "是否有相关专业实习",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "project_locations",
+      "label": "可接受项目地"
+    },
+    {
+      "key": "other_project_locations",
+      "label": "其他（可接受项目地）"
+    },
+    {
+      "key": "first_interview_passed",
+      "label": "是否通过一面",
+      "options": [
+        "是",
+        "否"
+      ],
+      "section": "面试评价"
+    },
+    {
+      "key": "first_interview_notes",
+      "label": "一面情况说明",
+      "type": "textarea"
+    },
+    {
+      "key": "second_interview_notes",
+      "label": "二面情况说明",
+      "type": "textarea"
+    },
+    {
+      "key": "result",
+      "label": "面试结果",
+      "options": [
+        "pass",
+        "发offer"
+      ]
+    },
+    {
+      "key": "personal_intention",
+      "label": "个人意向",
+      "type": "textarea"
+    },
+    {
+      "key": "basic_situation",
+      "label": "基本情况",
+      "type": "textarea"
+    },
+    {
+      "key": "candidate_id",
+      "label": "关联人才档案",
+      "ref": "candidates",
+      "hidden": true
+    },
+    {
+      "key": "date",
+      "label": "原面试日期",
+      "type": "date",
+      "hidden": true
+    },
+    {
+      "key": "round",
+      "label": "原面试轮次",
+      "hidden": true
+    },
+    {
+      "key": "interviewer",
+      "label": "原面试官",
+      "hidden": true
+    },
+    {
+      "key": "location",
+      "label": "原面试地点",
+      "hidden": true
+    },
+    {
+      "key": "score",
+      "label": "原综合评分",
+      "type": "number",
+      "hidden": true
+    },
+    {
+      "key": "evaluation",
+      "label": "原能力评价",
+      "type": "textarea",
+      "hidden": true
+    },
+    {
+      "key": "notes",
+      "label": "原面试记录",
+      "type": "textarea",
+      "hidden": true
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+:root {
+  --brand-950:#071d3d;
+  --brand-900:#0b2b59;
+  --brand-800:#123f7a;
+  --brand-700:#1557b0;
+  --brand-600:#1769d2;
+  --brand-100:#eaf3ff;
+  --brand-50:#f4f8ff;
+  --surface:#fff;
+  --canvas:#f2f6fb;
+  --text-strong:#10233f;
+  --text:#30435f;
+  --text-muted:#566782;
+  --border:#dfe7f1;
+  --shadow-sm:0 2px 10px rgba(9,42,88,.06);
+  --shadow-md:0 14px 40px rgba(9,42,88,.12);
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:16px;
+  --blue:var(--brand-600);
+  --line:var(--border);
+  --muted:var(--text-muted);
+}
+body { background:var(--canvas); color:var(--text-strong); }
+
+/* Administrative shell: navigation and account context. */
+aside {
+  background:linear-gradient(180deg,var(--brand-950),var(--brand-900));
+  border-right:0;
+  box-shadow:8px 0 30px rgba(7,29,61,.08);
+}
+
+aside .identity { color:#fff; }
+aside .identity strong,
+aside .nav-caption,
+aside .aside-bottom,
+aside .aside-bottom .hint { color:#aebfd9; }
+
+aside .logo { background:linear-gradient(135deg,var(--brand-600),#4d97ef); box-shadow:0 8px 20px rgba(0,0,0,.18); }
+aside nav button { color:#c9d6e9; border:1px solid transparent; }
+aside nav button:hover { color:#fff; background:rgba(255,255,255,.09); }
+aside nav button.active {
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand-600),#247be5);
+  box-shadow:0 10px 24px rgba(0,80,190,.28);
+}
+
+header { background:rgba(255,255,255,.94); border-color:var(--border); color:var(--text-muted); box-shadow:0 2px 12px rgba(9,42,88,.035); }
+.header-actions { gap:16px; }
+.text-button { color:var(--brand-700); border-radius:var(--radius-sm); }
+.text-button:hover { background:var(--brand-50); }
+.avatar { background:var(--brand-100); color:var(--brand-700); box-shadow:inset 0 0 0 1px rgba(23,105,210,.1); }
+.page-title { margin-bottom:30px; }
+.page-title p { color:var(--text-muted); }
+
+/* Surfaces, form controls, and actions. */
+.panel,
+.stat { border-color:var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow-sm); }
+.panel { background:var(--surface); }
+.panel-head { border-color:var(--border); }
+.stat { background:var(--surface); }
+.stat i { color:var(--brand-700); background:var(--brand-50); }
+
+input,
+select,
+textarea { border-color:var(--border); border-radius:var(--radius-sm); color:var(--text-strong); background:var(--surface); }
+input::placeholder,
+textarea::placeholder { color:#5a6b82; }
+input:focus,
+select:focus,
+textarea:focus { border-color:var(--brand-600); box-shadow:0 0 0 3px rgba(23,105,210,.12); }
+input[readonly] { background:var(--brand-50); color:var(--text-muted); }
+input:disabled,
+select:disabled,
+textarea:disabled { background:#f4f7fb; border-color:var(--border); color:#8a99ad; cursor:not-allowed; opacity:.72; }
+
+.primary,
+.secondary,
+.light { border-radius:var(--radius-sm); font-weight:650; transition:background-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+.primary { background:linear-gradient(135deg,var(--brand-700),var(--brand-600)); box-shadow:0 7px 16px rgba(21,87,176,.18); }
+.primary:hover { background:linear-gradient(135deg,var(--brand-800),var(--brand-700)); box-shadow:0 9px 20px rgba(21,87,176,.24); }
+.secondary { border-color:var(--border); color:var(--text); background:var(--surface); }
+.secondary:hover,
+.light:hover { background:var(--brand-50); border-color:#c9daf0; color:var(--brand-700); }
+.light { color:var(--brand-700); }
+.primary:disabled,
+.secondary:disabled,
+.light:disabled { box-shadow:none; opacity:.55; }
+.primary:focus-visible,
+.secondary:focus-visible,
+.light:focus-visible { outline:3px solid #0b5fcc; outline-offset:2px; }
+
+/* Destructive actions stay visually distinct after the shared action theme loads. */
+.secondary.delete-selected { color:#a74245; border-color:#e4b2b5; background:#fff6f6; }
+.secondary.delete-selected:hover { color:#873033; border-color:#ce7378; background:#ffe9ea; }
+.primary.delete-confirm { background:#b6494b; box-shadow:0 7px 16px rgba(182,73,75,.2); }
+.primary.delete-confirm:hover { background:#973d40; box-shadow:0 9px 20px rgba(151,61,64,.25); }
+.secondary.delete-selected:focus-visible,
+.primary.delete-confirm:focus-visible { outline:3px solid #0b5fcc; outline-offset:2px; }
+.secondary.delete-selected:disabled { color:#9a6a6c; border-color:#ead7d8; background:#fbf5f5; box-shadow:none; opacity:1; }
+.primary.delete-confirm:disabled { background:#d89ea0; box-shadow:none; opacity:1; }
+
+/* Data views, selection, and record actions. */
+.toolbar { border-color:var(--border); background:#fbfdff; }
+.toolbar input { background:var(--surface); }
+.count { color:var(--brand-700); background:var(--brand-100); border-radius:999px; }
+table { color:var(--text); }
+th { background:#f4f7fb; color:#52647e; font-weight:650; }
+.workspace main .table-wrap {
+  max-height:min(58vh,640px);
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.workspace main .table-wrap thead th {
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+td { border-color:#eaf0f6; }
+tbody tr:hover { background:#f6faff; }
+.row-check { accent-color:var(--brand-600); }
+.row-actions button { color:var(--brand-700); border-radius:var(--radius-sm); }
+.row-actions button:hover { background:var(--brand-50); }
+.row-actions button.danger { color:#b6494b; }
+.row-actions button.danger:hover { background:#fff3f3; }
+.badge { border-radius:999px; font-weight:650; background:var(--brand-100); color:var(--brand-700); }
+.badge.green { background:#e8f7f0; color:#187353; }
+.badge.red { background:#fff0f0; color:#ad4244; }
+.pagination { border-color:var(--border); color:var(--text-muted); background:#fbfdff; }
+.pagination .secondary { min-height:34px; padding:7px 12px; }
+
+/* Dialog surface and regions. Floating-close geometry remains in table-tools.css. */
+dialog { border:1px solid rgba(223,231,241,.9); border-radius:var(--radius-lg); box-shadow:0 30px 90px rgba(7,29,61,.3); color:var(--text-strong); }
+dialog::backdrop { background:rgba(7,29,61,.58); backdrop-filter:blur(4px); }
+dialog.floating-close-dialog > .dialog-surface { border-radius:var(--radius-lg); box-shadow:0 30px 90px rgba(7,29,61,.3); }
+.dialog-head { border-color:var(--border); background:var(--surface); }
+.dialog-foot { border-color:var(--border); background:#f8fbff; }
+.close { color:var(--text-muted); border-radius:50%; }
+.close:hover { background:var(--brand-50); color:var(--brand-700); }
+.floating-dialog-close { color:var(--text-muted); }
+.floating-dialog-close:hover { color:var(--brand-700); }
+
+/* Recruitment overview: executive summary and pipeline panels. */
+.overview-banner {
+  background:linear-gradient(120deg,var(--brand-900),var(--brand-700) 68%,#2177dc);
+  border-radius:var(--radius-lg);
+  box-shadow:0 18px 45px rgba(9,52,111,.2);
+}
+.overview-banner p { color:#d5e4fb; }
+.recruitment-overview { margin-bottom:28px; }
+.recruitment-overview>.panel-head { border:0; padding:0 2px 14px; }
+.recruitment-overview>.panel-head h2 { color:var(--text-strong); }
+.overview-page-actions { display:flex; align-items:center; gap:24px; }
+.stats { gap:18px; }
+.stat { transition:transform .18s ease,box-shadow .18s ease; }
+.stat:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(9,42,88,.11); }
+.stat strong { color:var(--text-strong); }
+.stat p { border-color:#e7eef7; color:var(--text-muted); }
+.stat p b { color:var(--brand-700); }
+.overview-grid .panel,
+.recruitment-overview .panel { box-shadow:var(--shadow-sm); }
+.pipeline { background:#fbfdff; }
+.pipeline>div { color:var(--text); }
+.pipeline b { color:var(--brand-700); }
+progress::-webkit-progress-bar { background:#e7eef8; }
+progress::-webkit-progress-value { background:linear-gradient(90deg,var(--brand-700),var(--brand-600)); }
+
+/* Authentication: keep the brand statement polished and the form easy to scan. */
+.auth { background:var(--canvas); }
+.auth-brand {
+  background:linear-gradient(145deg,var(--brand-950),var(--brand-700));
+  box-shadow:inset -1px 0 rgba(255,255,255,.08);
+}
+.auth-brand>span,
+.auth-brand p,
+.auth-brand small { color:#c7d9f2; }
+.auth-brand h1 { letter-spacing:.2px; }
+.auth-card {
+  background:#fff;
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-md);
+}
+.auth-card .eyebrow { color:var(--brand-700); }
+.auth-card label { color:var(--text); }
+.auth-card input:focus { border-color:var(--brand-600); box-shadow:0 0 0 3px rgba(23,105,210,.14); }
+
+/* Public submission pages: a calm hierarchy for applicant-facing forms. */
+.apply { max-width:940px; }
+.apply .identity { color:var(--text-strong); }
+.apply .identity strong { color:var(--text-muted); }
+.apply-title { border-bottom:1px solid var(--border); }
+.apply-title .eyebrow { color:var(--brand-700); }
+.apply-title h1 { color:var(--text-strong); }
+.apply-title p { color:var(--text-muted); }
+.apply .panel { box-shadow:0 18px 48px rgba(9,42,88,.1); }
+.apply .panel-head { background:#fbfdff; }
+.apply .panel-head h3 { color:var(--text-strong); }
+.consent { border-top:1px solid #edf2f8; }
+.consent label { color:var(--text); }
+.consent input { accent-color:var(--brand-600); }
+.success>div { color:#187353; }
+.success h2 { color:var(--text-strong); }
+.success p { color:var(--text-muted); }
+
+/* Public resume batch import: make upload, selection, and outcome states distinct. */
+.resume-file-picker-area {
+  border:1px dashed #b9c9df;
+  border-radius:var(--radius-md);
+  background:var(--brand-50);
+  padding:18px;
+}
+.resume-file-picker-area .hint { color:#58708f; }
+.resume-file-picker-area>.add-resume-files { border-color:#b9c9df; color:var(--brand-700); background:#fff; }
+.resume-file-picker-area>.add-resume-files:hover { border-color:var(--brand-600); background:#f8fbff; }
+.resume-selected-files li { border-color:#d6e1ef; border-radius:var(--radius-sm); background:#fff; box-shadow:0 1px 3px rgba(9,42,88,.04); }
+.resume-selected-files li span { color:var(--text); }
+.resume-selected-files li button { color:#a74447; }
+.resume-import-result { border-top:1px solid #e7eef6; }
+.resume-import-list { color:var(--text); }
+.resume-import-list .import-success,
+.import-ok { color:#187353; }
+.resume-import-list .import-failure { color:#ad4244; }
+
+/* Candidate experience editors: preserve established grids while clarifying grouped entries. */
+.education-editor,
+.candidate-experience-editor,
+.candidate-project-experience-editor { border-color:#d6e1ef; background:#f8fbff; }
+.education-editor { box-shadow:var(--shadow-sm); }
+.education-editor-head h3,
+.candidate-experience-head h3,
+.candidate-project-experience-head h3 { color:var(--text-strong); }
+.education-list fieldset,
+.candidate-experience-list fieldset,
+.candidate-project-experience-list fieldset {
+  border-color:#d6e1ef;
+  background:#fbfdff;
+  box-shadow:inset 3px 0 var(--brand-100);
+}
+.education-list legend,
+.candidate-experience-list legend,
+.candidate-project-experience-list legend { color:var(--brand-800); }
+.education-list fieldset label,
+.candidate-experience-list fieldset label,
+.candidate-project-experience-list fieldset label { color:var(--text); }
+
+/* QR cards retain their existing scan-safe image dimensions and clear space. */
+.qr-dialog .qr-grid { background:var(--canvas); }
+.qr-dialog .qr-card { border-color:#d8e3f0; border-radius:var(--radius-lg); box-shadow:var(--shadow-md); }
+.qr-image-shell { background:#fff; }
+.qr-card-label { color:var(--text-strong); }
+.qr-card-company { color:var(--text); }
+.qr-download { border-color:#c9daf0; background:var(--brand-50); color:var(--brand-700); }
+.qr-download:hover { border-color:#a9c5e8; background:var(--brand-100); }
+
+/* A consistent keyboard indicator also covers controls outside the base component set. */
+:focus-visible { outline:3px solid #0b5fcc; outline-offset:3px; }
+
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; }
+}
+
+/* Preserve the desktop toolbar hierarchy while leaving room for the floating close control. */
+@media(max-width:1150px) {
+  .toolbar { gap:14px; }
+  dialog.floating-close-dialog { max-width:calc(100vw - 96px); }
+}
+
+@media(max-width:760px) {
+  aside { box-shadow:none; }
+  aside nav button.active { box-shadow:none; }
+  .overview-page-actions { gap:12px; }
+  .toolbar { padding:16px; }
+  .records .toolbar-top { flex-wrap:wrap; }
+  .records .toolbar-top #search { width:100%; }
+  .records .toolbar-actions { flex-wrap:wrap; overflow-x:visible; padding-bottom:0; }
+  dialog,
+  dialog.floating-close-dialog > .dialog-surface { box-shadow:var(--shadow-sm); }
+  .qr-dialog .qr-grid,
+  .resume-qr-grid { grid-template-columns:1fr; }
+  .qr-dialog .qr-card { box-shadow:var(--shadow-sm); }
+}

@@ -1,0 +1,196 @@
+{
+  "title": "新员工信息登记表",
+  "short": "新员工",
+  "description": "登记新员工个人资料、教育背景与岗位信息",
+  "fields": [
+    {
+      "key": "archive_no",
+      "label": "档案编号",
+      "readonly": true
+    },
+    {
+      "key": "name",
+      "label": "姓名",
+      "required": true,
+      "fullWidth": true
+    },
+    {
+      "key": "identity_card",
+      "label": "身份证",
+      "fullWidth": true
+    },
+    {
+      "key": "gender",
+      "label": "性别",
+      "options": [
+        "男",
+        "女"
+      ]
+    },
+    {
+      "key": "ethnicity",
+      "label": "民族"
+    },
+    {
+      "key": "birthdate",
+      "label": "出生日期",
+      "type": "month"
+    },
+    {
+      "key": "phone",
+      "label": "联系电话",
+      "type": "tel"
+    },
+    {
+      "key": "school_name",
+      "label": "毕业院校"
+    },
+    {
+      "key": "education",
+      "label": "学历",
+      "options": [
+        "专科",
+        "本科",
+        "硕士",
+        "博士"
+      ]
+    },
+    {
+      "key": "major",
+      "label": "专业"
+    },
+    {
+      "key": "is_elite",
+      "label": "是否名校优生",
+      "options": [
+        "是",
+        "否"
+      ]
+    },
+    {
+      "key": "height",
+      "label": "身高（cm）",
+      "type": "number",
+      "min": 1,
+      "max": 300
+    },
+    {
+      "key": "weight",
+      "label": "体重（kg）",
+      "type": "number",
+      "min": 1,
+      "max": 500
+    },
+    {
+      "key": "shoe_size",
+      "label": "鞋码",
+      "type": "number",
+      "min": 1,
+      "max": 100
+    },
+    {
+      "key": "position",
+      "label": "岗位",
+      "options": [
+        "机械工程师",
+        "电气工程师",
+        "安全工程师",
+        "土建工程师",
+        "管道工程师",
+        "设备工程师",
+        "数据分析师",
+        "软件工程师",
+        "财务专员",
+        "其它"
+      ]
+    },
+    {
+      "key": "position_detail",
+      "label": "其它岗位名称",
+      "listHidden": true
+    },
+    {
+      "key": "home_address",
+      "label": "家庭住址"
+    },
+    {
+      "key": "enrollment_type",
+      "label": "入学形式",
+      "options": [
+        "普通全日制",
+        "非全日制",
+        "统招专升本"
+      ]
+    },
+    {
+      "key": "language",
+      "label": "语言能力",
+      "maxLength": 1500
+    },
+    {
+      "key": "channel",
+      "label": "招聘途径",
+      "options": [
+        "校园线下",
+        "校园平台",
+        "智联招聘"
+      ]
+    },
+    {
+      "key": "hometown",
+      "label": "籍贯"
+    },
+    {
+      "key": "notes",
+      "label": "备注",
+      "type": "textarea"
+    },
+    {
+      "key": "candidate_id",
+      "label": "原入职人员",
+      "ref": "candidates",
+      "hidden": true
+    },
+    {
+      "key": "employee_no",
+      "label": "原员工编号",
+      "hidden": true
+    },
+    {
+      "key": "department",
+      "label": "原入职部门",
+      "hidden": true
+    },
+    {
+      "key": "start_date",
+      "label": "原入职日期",
+      "type": "date",
+      "hidden": true
+    },
+    {
+      "key": "location",
+      "label": "原工作地点",
+      "hidden": true
+    },
+    {
+      "key": "emergency_contact",
+      "label": "原紧急联系人",
+      "hidden": true
+    },
+    {
+      "key": "emergency_phone",
+      "label": "原紧急联系电话",
+      "hidden": true
+    },
+    {
+      "key": "status",
+      "label": "原报到状态",
+      "hidden": true,
+      "options": [
+        "待报到",
+        "已报到",
+        "取消入职"
+      ]
+    }
+  ]
+}
