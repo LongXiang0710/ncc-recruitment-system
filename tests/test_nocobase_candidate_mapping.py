@@ -13,6 +13,7 @@ class CandidateMappingTests(unittest.TestCase):
             "email": "test@example.com", "political_status": "群众", "hometown": "江苏南京",
             "recruitment_type": "校园招聘", "channel": "校园线下", "channel_detail": "",
             "position": "机械工程师", "position_detail": "", "notes": "must-not-upload",
+            "status": "待筛选",
             "created_at": "2026-09-29T10:00:00", "id": 99,
         }
         self.assertEqual(to_nocobase(local), {
@@ -21,6 +22,7 @@ class CandidateMappingTests(unittest.TestCase):
             "email": "test@example.com", "political_status": "群众", "area": "江苏南京",
             "Type": "校园招聘", "channel": "校园线下", "detailed": "",
             "post": "机械工程师", "Other_job_titles": "",
+            "status": "待筛选",
         })
 
     def test_social_channel_uses_social_field_and_round_trips(self):

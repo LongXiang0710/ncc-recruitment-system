@@ -146,6 +146,14 @@ class AttachmentRepositoryTests(unittest.TestCase):
         self.assertTrue(self.repository(orphan).delete_if_unreferenced(5))
         self.assertEqual(orphan.calls[-1][1], "attachments:destroy")
 
+    def test_restore_reassociates_snapshot_ids_without_upload_or_delete(self):
+        client = FakeClient(responses=[{}])
+        self.repository(client).restore(3, [{"id": 8}, {"id": 9}])
+        self.assertEqual(client.calls, [(
+            "request", "campus_talent_pool/3/biographical_notes:set",
+            {"method": "POST", "body": {"values": [8, 9]}},
+        )])
+
     def test_invalid_attachment_responses_are_protocol_errors(self):
         cases = (
             FakeClient(responses=[{}]),

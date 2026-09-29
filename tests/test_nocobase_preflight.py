@@ -44,6 +44,7 @@ def swagger_document():
                 "Other_job_titles": {"type": "string", "title": "其他岗位名称"},
                 "channel": {"type": "string", "title": "校园招聘渠道"},
                 "Social_recruitment_channels": {"type": "string", "title": "社会招聘渠道"},
+                "status": {"type": "string", "title": "招聘阶段"},
             },
         },
         "campus_talent_pool.Education_Background": {

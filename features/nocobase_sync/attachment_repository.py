@@ -137,6 +137,14 @@ class AttachmentRepository:
         content, mime_type = self.client.download(url)
         return content, mime_type, filename
 
+    def restore(self, candidate_id: int, snapshot: list[dict]) -> None:
+        candidate_id = self._identifier(candidate_id, "人才记录")
+        if not isinstance(snapshot, list) or any(
+            not isinstance(row, dict) or type(row.get("id")) is not int for row in snapshot
+        ):
+            raise ValueError("简历附件快照无效")
+        self._set(candidate_id, [row["id"] for row in snapshot])
+
     def delete_if_unreferenced(self, attachment_id: int) -> bool:
         attachment_id = self._identifier(attachment_id)
         endpoint = "campus_talent_pool:list"

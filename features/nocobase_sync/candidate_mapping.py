@@ -14,6 +14,7 @@ LOCAL_TO_REMOTE = {
     "channel_detail": "detailed",
     "position": "post",
     "position_detail": "Other_job_titles",
+    "status": "status",
 }
 REMOTE_TO_LOCAL = {remote: local for local, remote in LOCAL_TO_REMOTE.items()}
 
