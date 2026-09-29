@@ -10,9 +10,10 @@ from features.nocobase_sync.client import NocoBaseClient, NocoBaseError
 
 
 class Response(io.BytesIO):
-    def __init__(self, payload, status=200):
+    def __init__(self, payload, status=200, headers=None):
         super().__init__(payload)
         self.status = status
+        self.headers = headers or {}
 
     def __enter__(self):
         return self
@@ -81,6 +82,100 @@ class NocoBaseClientTests(unittest.TestCase):
         with self.assertRaises(NocoBaseError) as raised:
             client.request("campus_talent_pool:list")
         self.assertEqual(raised.exception.kind, "disabled")
+
+    def test_request_envelope_preserves_valid_meta(self):
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda _r, _t: Response(b'{"data":[{"id":1}],"meta":{"count":9,"page":1}}'),
+        )
+        response = client.request_envelope("campus_talent_pool:list")
+        self.assertEqual(response.data, [{"id": 1}])
+        self.assertEqual(response.meta, {"count": 9, "page": 1})
+
+    def test_request_envelope_rejects_non_object_meta(self):
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda _r, _t: Response(b'{"data":[],"meta":[]}'),
+        )
+        with self.assertRaises(NocoBaseError) as raised:
+            client.request_envelope("campus_talent_pool:list")
+        self.assertEqual(raised.exception.kind, "protocol")
+
+    def test_upload_builds_multipart_and_requires_integer_attachment_id(self):
+        captured = []
+        responses = [Response(b'{"data":{"id":31}}'), Response(b'{"data":{"title":"bad"}}')]
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "top-secret", True),
+            opener=lambda request, timeout: captured.append((request, timeout)) or responses.pop(0),
+        )
+        result = client.upload("attachments:create", filename="../简历.pdf", mime_type="application/pdf",
+                               content=b"PDF-CONTENT", params={"attachmentField": "campus_talent_pool.biographical_notes"})
+        self.assertEqual(result["id"], 31)
+        request = captured[0][0]
+        self.assertEqual(request.method, "POST")
+        self.assertIn("attachmentField=campus_talent_pool.biographical_notes", request.full_url)
+        self.assertTrue(request.get_header("Content-type").startswith("multipart/form-data; boundary="))
+        self.assertIn("简历.pdf".encode("utf-8"), request.data)
+        self.assertNotIn("../".encode(), request.data)
+        self.assertIn(b"PDF-CONTENT", request.data)
+        with self.assertRaises(NocoBaseError) as raised:
+            client.upload("attachments:create", filename="bad.pdf", mime_type="application/pdf", content=b"x")
+        self.assertEqual(raised.exception.kind, "protocol")
+        self.assertNotIn("top-secret", str(raised.exception))
+
+    def test_download_rejects_non_http_and_never_sends_credentials_cross_origin(self):
+        requests = []
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "top-secret", True),
+            opener=lambda request, timeout: requests.append(request) or Response(
+                b"file", headers={"Content-Type": "application/pdf"}),
+        )
+        self.assertEqual(client.download("https://example.test/files/a.pdf"), (b"file", "application/pdf"))
+        self.assertEqual(requests[-1].get_header("Authorization"), "Bearer top-secret")
+        self.assertEqual(client.download("https://cdn.example.net/a.pdf"), (b"file", "application/pdf"))
+        self.assertIsNone(requests[-1].get_header("Authorization"))
+        for value in ("file:///tmp/a.pdf", "https://user:pass@example.test/a", "https://example.test/a#part"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                client.download(value)
+
+    def test_download_requires_enabled_configuration_and_normalizes_default_ports(self):
+        disabled = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", False),
+            opener=lambda *_: self.fail("connection must not open"),
+        )
+        with self.assertRaises(NocoBaseError) as raised:
+            disabled.download("https://example.test/file.pdf")
+        self.assertEqual(raised.exception.kind, "disabled")
+
+        requests = []
+        enabled = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda request, _timeout: requests.append(request) or Response(b"file"),
+        )
+        enabled.download("https://example.test:443/file.pdf")
+        self.assertEqual(requests[-1].get_header("Authorization"), "Bearer token")
+
+    def test_download_rejects_invalid_port(self):
+        client = NocoBaseClient(NocoBaseConfig("https://example.test", "token", True))
+        with self.assertRaises(ValueError):
+            client.download("https://example.test:not-a-port/file.pdf")
+
+    def test_upload_sanitizes_multipart_header_characters_in_filename(self):
+        requests = []
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda request, _timeout: requests.append(request) or Response(b'{"data":{"id":1}}'),
+        )
+        client.upload(
+            "attachments:create",
+            filename='resume"\r\nX-Injection: yes.pdf',
+            mime_type="application/pdf",
+            content=b"pdf",
+        )
+        disposition = requests[0].data.split(b"\r\n", 2)[1]
+        self.assertNotIn(b"\r", disposition)
+        self.assertNotIn(b"\n", disposition)
+        self.assertNotIn(b'filename="resume"', disposition)
 
 
 if __name__ == "__main__":
