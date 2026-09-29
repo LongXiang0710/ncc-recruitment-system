@@ -60,6 +60,18 @@ class RemoteCandidateService:
         result = self.candidates.list_page(page=page, page_size=page_size, query=query)
         return {"rows": [self._aggregate(row) for row in result["rows"]], "count": result["count"]}
 
+    def list_all(self, query: str = "") -> list[dict]:
+        rows = []
+        page = 1
+        while True:
+            result = self.list(page=page, page_size=100, query=query)
+            rows.extend(result["rows"])
+            if len(rows) >= result["count"]:
+                return rows
+            if not result["rows"]:
+                raise NocoBaseError("protocol", None, "campus_talent_pool:list")
+            page += 1
+
     def get(self, identifier: int) -> dict | None:
         row = self.candidates.get(identifier)
         return self._aggregate(row) if row is not None else None
@@ -69,6 +81,12 @@ class RemoteCandidateService:
             existing = self.candidates.find_by_phone(phone)
             return existing is not None and existing.get("id") != allowed_id
         return validate_remote_candidate(payload, self.schema, phone_exists=phone_exists)
+
+    def validate(self, payload: dict) -> dict:
+        return self._validate(payload)
+
+    def read_attachment(self, identifier: int) -> tuple[bytes, str, str]:
+        return self.attachments.read(identifier)
 
     def _cleanup_created(self, identifier: int) -> None:
         cleanup_failed = False

@@ -25,6 +25,10 @@ from features.candidates import positions as candidate_positions
 from features.resume_documents import dify_mapping
 from features.resume_documents import file_types as resume_file_types
 from features.resume_documents.filename_position import infer_position
+from features.nocobase_sync.http_adapter import (
+    build_candidate_service,
+    handle_remote_candidate_request,
+)
 from datetime import datetime
 from contextlib import contextmanager
 from http.cookies import SimpleCookie
@@ -1209,6 +1213,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not member:
                     return self.send(401, {'error': '账号已注销，请重新登录'})
                 user = {**user, 'role': 'manager' if member['is_admin'] else 'member'}
+            candidate_service = getattr(self.server, 'candidate_service', None)
+            if candidate_service is not None:
+                if path.startswith('/api/attachments/'):
+                    attachment_id = path.rsplit('/', 1)[-1]
+                    if attachment_id.isdigit() and handle_remote_candidate_request(
+                            self, method, 'attachment:' + attachment_id, parse_qs(url.query)):
+                        return
+                candidate_parts = path.strip('/').split('/')
+                if len(candidate_parts) in (2, 3) and candidate_parts[:2] == ['api', 'candidates']:
+                    identifier = candidate_parts[2] if len(candidate_parts) == 3 else None
+                    if handle_remote_candidate_request(
+                            self, method, identifier, parse_qs(url.query)):
+                        return
             if re.fullmatch(r'/api/members/[0-9]+/role', path) and method == 'PUT':
                 if user['role'] != 'admin':
                     return self.send(403, {'error': '仅admin账号可以任命或取消管理员'})
@@ -1737,6 +1754,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     initialize()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
+    server.candidate_service = build_candidate_service(DATA)
+    server.candidate_imports = IMPORTS
+    server.candidate_schema = SCHEMAS['candidates']
+
+    def prepare_candidate_import(payload):
+        with db() as conn:
+            return prepare_rows(
+                'candidates', SCHEMAS['candidates'], payload, conn,
+                lambda _entity, values, _conn: values,
+            )
+
+    server.candidate_import_preparer = prepare_candidate_import
     local_url = f'http://localhost:{args.port}'
     print(f'Campus recruitment: {local_url}', flush=True)
     access_url = public_base_url('localhost:' + str(args.port), args.port)
