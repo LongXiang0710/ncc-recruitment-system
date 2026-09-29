@@ -51,10 +51,12 @@ def normalize_url(value: str) -> str:
         or not hostname
         or parsed.username is not None
         or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
         or port is not None and not 1 <= port <= 65535
     ):
         raise ValueError("NocoBase 地址必须是带主机名的 HTTP 或 HTTPS 网址。")
-    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), parsed.query, parsed.fragment))
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
 
 
 def _require_nonblank(value: str, label: str) -> str:

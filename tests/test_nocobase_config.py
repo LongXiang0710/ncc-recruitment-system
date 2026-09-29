@@ -87,6 +87,20 @@ class NocoBaseConfigTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 config.normalize_url(value)
 
+    def test_api_base_url_rejects_query_and_fragment(self):
+        for value in ("https://example.test?token=wrong", "https://example.test/#section"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                config.normalize_url(value)
+
+    def test_empty_ciphertext_does_not_replace_existing_configuration(self):
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            config.save(data_dir, "https://example.test", "token", protect=lambda _: b"existing")
+            previous = (data_dir / "nocobase-config.json").read_bytes()
+            with self.assertRaises(ValueError):
+                config.save(data_dir, "https://other.test", "new-token", protect=lambda _: b"")
+            self.assertEqual((data_dir / "nocobase-config.json").read_bytes(), previous)
+
     def test_protector_and_unprotector_must_return_bytes(self):
         with TemporaryDirectory() as directory:
             data_dir = Path(directory)
