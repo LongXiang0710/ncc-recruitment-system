@@ -15,8 +15,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 
 CONFIG_FILENAME = "nocobase-config.json"
-CONFIG_VERSION = 1
-_RECONFIGURE_MESSAGE = "无法解密 NocoBase 密码，请在当前 Windows 帐户下重新配置。"
+CONFIG_VERSION = 2
+_RECONFIGURE_MESSAGE = "无法解密 NocoBase API Key，请在当前 Windows 帐户下重新配置。"
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,8 @@ class NocoBaseConfig:
     """Validated connection values held only in process memory."""
 
     url: str
-    username: str
-    password: str
+    api_key: str
+    enabled: bool = True
 
 
 class _DPAPIUnavailable(RuntimeError):
@@ -132,23 +132,24 @@ def _config_path(data_dir: Path) -> Path:
 def save(
     data_dir: Path,
     url: str,
-    username: str,
-    password: str,
+    api_key: str,
+    enabled: bool = True,
     protect: Callable[[bytes], bytes] | None = None,
 ) -> None:
-    """Validate, encrypt and atomically persist the NocoBase connection settings."""
+    """Validate, encrypt and atomically persist the NocoBase API settings."""
     normalized_url = normalize_url(url)
-    username = _require_nonblank(username, "用户名")
-    password = _require_nonblank(password, "密码")
+    api_key = _require_nonblank(api_key, "API Key")
+    if type(enabled) is not bool:
+        raise TypeError("启用开关必须是布尔值。")
     protector = protect if protect is not None else _protect_password
-    ciphertext = _require_bytes(protector(password.encode("utf-8")), "密码保护函数")
+    ciphertext = _require_bytes(protector(api_key.encode("utf-8")), "API Key 保护函数")
     if not ciphertext:
-        raise ValueError("密码保护函数返回了空密文，配置未保存。")
+        raise ValueError("API Key 保护函数返回了空密文，配置未保存。")
     payload = {
         "version": CONFIG_VERSION,
         "url": normalized_url,
-        "username": username,
-        "password": base64.b64encode(ciphertext).decode("ascii"),
+        "api_key": base64.b64encode(ciphertext).decode("ascii"),
+        "enabled": enabled,
     }
 
     destination = _config_path(data_dir)
@@ -175,12 +176,15 @@ def _read_payload(path: Path) -> dict[str, object]:
             payload = json.load(source)
     except (FileNotFoundError, OSError, json.JSONDecodeError, UnicodeDecodeError) as error:
         raise ValueError("NocoBase 配置文件不存在或已损坏，请重新配置。") from error
-    if not isinstance(payload, dict) or set(payload) != {"version", "url", "username", "password"}:
-        raise ValueError("NocoBase 配置文件格式无效，请重新配置。")
+    if isinstance(payload, dict) and set(payload) == {"version", "url", "username", "password"}:
+        raise ValueError("NocoBase 旧账号密码配置已失效，请使用 API Key 重新配置。")
+    if not isinstance(payload, dict) or set(payload) != {"version", "url", "api_key", "enabled"}:
+        raise ValueError("NocoBase API Key 配置文件格式无效，请重新配置。")
     if (
         type(payload["version"]) is not int
         or payload["version"] != CONFIG_VERSION
-        or not all(isinstance(payload[key], str) for key in ("url", "username", "password"))
+        or not all(isinstance(payload[key], str) for key in ("url", "api_key"))
+        or type(payload["enabled"]) is not bool
     ):
         raise ValueError("NocoBase 配置文件版本或字段无效，请重新配置。")
     return payload
@@ -190,7 +194,7 @@ def load(data_dir: Path, unprotect: Callable[[bytes], bytes] | None = None) -> N
     """Load and decrypt a configuration, rejecting malformed or wrong-account data."""
     payload = _read_payload(_config_path(data_dir))
     try:
-        ciphertext = base64.b64decode(payload["password"], validate=True)
+        ciphertext = base64.b64decode(payload["api_key"], validate=True)
     except (ValueError, binascii.Error, UnicodeEncodeError) as error:
         raise ValueError("NocoBase 配置文件中的密码密文无效，请重新配置。") from error
     if not ciphertext:
@@ -198,7 +202,6 @@ def load(data_dir: Path, unprotect: Callable[[bytes], bytes] | None = None) -> N
 
     try:
         normalized_url = normalize_url(payload["url"])
-        username = _require_nonblank(payload["username"], "用户名")
     except ValueError as error:
         raise ValueError("NocoBase 配置文件字段无效，请重新配置。") from error
 
@@ -211,12 +214,12 @@ def load(data_dir: Path, unprotect: Callable[[bytes], bytes] | None = None) -> N
         raise ValueError(_RECONFIGURE_MESSAGE) from error
     decrypted = _require_bytes(decrypted, "密码解密函数")
     try:
-        password = decrypted.decode("utf-8")
+        api_key = decrypted.decode("utf-8")
     except UnicodeDecodeError as error:
         raise ValueError(_RECONFIGURE_MESSAGE) from error
-    if not password.strip():
+    if not api_key.strip():
         raise ValueError(_RECONFIGURE_MESSAGE)
-    return NocoBaseConfig(normalized_url, username, password)
+    return NocoBaseConfig(normalized_url, api_key, payload["enabled"])
 
 
 def configured(data_dir: Path, unprotect: Callable[[bytes], bytes] | None = None) -> bool:
@@ -225,4 +228,4 @@ def configured(data_dir: Path, unprotect: Callable[[bytes], bytes] | None = None
         value = load(data_dir, unprotect=unprotect)
     except Exception:
         return False
-    return bool(value.url.strip() and value.username.strip() and value.password.strip())
+    return bool(value.enabled and value.url.strip() and value.api_key.strip())

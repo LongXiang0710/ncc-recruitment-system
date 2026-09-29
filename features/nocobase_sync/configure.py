@@ -1,10 +1,9 @@
-"""Interactive, local-only configuration command for NocoBase synchronization."""
+"""Interactive, local-only configuration command for the NocoBase API."""
 
 from __future__ import annotations
 
 import getpass
 import os
-from importlib import import_module
 from pathlib import Path
 
 from .config import load, save
@@ -19,32 +18,16 @@ def default_data_dir() -> Path:
 
 
 def main() -> int:
-    """Prompt for local credentials and optionally perform a read-only login check."""
+    """Prompt for a local API endpoint and hidden API Key."""
     url = input("NocoBase 地址: ")
-    username = input("NocoBase 用户名: ")
-    password = getpass.getpass("NocoBase 密码: ")
+    api_key = getpass.getpass("NocoBase API Key（输入不显示）: ")
     try:
-        save(default_data_dir(), url, username, password)
+        save(default_data_dir(), url, api_key)
     except (RuntimeError, ValueError, TypeError) as error:
         print(f"配置未保存：{error}")
         return 1
 
-    print("配置已保存。")
-    if input("是否测试连接？[y/N]: ").strip().lower() not in {"y", "yes"}:
-        return 0
-
-    try:
-        test_login = import_module("features.nocobase_sync.browser").test_login
-    except (ImportError, AttributeError):
-        print("配置已保存，连接测试将在浏览器模块完成后可用")
-        return 0
-
-    try:
-        test_login(load(default_data_dir()))
-    except Exception:
-        print("连接测试失败，请检查 NocoBase 地址、账号和网络后重试。")
-        return 1
-    print("连接测试成功。")
+    print("配置已保存。API Key 已用 Windows DPAPI 加密。")
     return 0
 
 
