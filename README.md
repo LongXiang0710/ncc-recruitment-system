@@ -16,11 +16,21 @@ python server.py --host 0.0.0.0 --port 8116
 
 ## NocoBase API 配置
 
-系统已建立 NocoBase HTTP API 基础层，不再使用 Playwright 模拟页面操作。双击 `配置NocoBase.bat`，依次输入 NocoBase 服务地址和 API Key。API Key 输入时不回显，并使用当前 Windows 账号的 DPAPI 加密保存到 `data/nocobase-config.json`。
+系统的人才库可以显式切换为 NocoBase HTTP API，不再使用 Playwright 模拟页面操作。其他业务模块、登录账号和系统设置仍保存在 SQLite。设计电脑保持 SQLite，不配置、不启用正式 NocoBase，也不会向正式库写入测试数据。
 
-配置示例地址为 `http://cloud.njncc.com:443/`，程序会自动拼接 `/api/`。不要将 API Key 写入源码、日志、截图或 Git 仓库。旧的用户名/密码配置不会被当成 API Key 使用，升级后需重新运行配置工具。
+请只在实际运行服务的固定 IP 电脑上按以下顺序操作：
 
-当前已完成招聘人才库主表的 API 客户端、字段映射和 CRUD 仓库层。教育经历、工作经历、项目经历及附件关联完成前，现有人才库页面仍使用 SQLite，防止未映射字段丢失。后续完成关联表、历史数据迁移和数量校验后，再整体切换人才库读写。
+1. 关闭招聘系统服务，把程序复制或更新到固定 IP 电脑。
+2. 双击 `配置NocoBase.bat`，输入 NocoBase 服务地址和 API Key。API Key 输入时不回显。
+3. 双击 `检查NocoBase连接.bat`。该步骤只读取接口文档和架构，不创建、修改或删除人才数据；每项均显示“通过”后再继续。
+4. 双击 `启用NocoBase人才库.bat`。程序会再次执行只读预检，任一检查失败都不会启用。
+5. 重新启动招聘系统，先用虚构人员完成新增、查询、修改、附件和删除验收，再录入真实数据。
+
+配置使用当前 Windows 账号的 DPAPI 加密，保存在数据目录的 `nocobase-config.json`。DPAPI 密文不能直接复制到另一台电脑使用，因此从设计电脑或旧服务器迁移程序后，必须在固定 IP 电脑上重新配置。不得把 API Key 写入源码、批处理、日志、截图或 Git 仓库。
+
+切换只改变后续人才库请求的数据源，不会迁移 SQLite 中的历史人才，也不会把 NocoBase 数据复制回 SQLite。启用后如果 NocoBase 网络、权限或接口异常，请求会直接失败并显示诊断编号，不会回退到 SQLite，也不会双写，避免两套数据悄悄分叉。
+
+需要临时停用时，先关闭服务，再双击 `停用NocoBase人才库.bat`，随后重启。该操作只把下一次启动的人才库数据源改回 SQLite，不删除 NocoBase 配置、远端数据或本地数据库；再次启用仍须通过只读预检。
 
 ## 局域网访问
 

@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-python -m features.nocobase_sync.configure
+python -m features.nocobase_sync.configure configure
 pause
