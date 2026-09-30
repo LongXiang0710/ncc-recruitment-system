@@ -39,6 +39,7 @@ class RemoteServices:
     resumes: RemoteResumeService
     recognition: RecognitionService
     resume_candidates: ResumeCandidateService
+    preflight: object | None = None
 
 
 def build_remote_services(data_dir: Path) -> RemoteServices | None:
@@ -64,7 +65,7 @@ def build_remote_services(data_dir: Path) -> RemoteServices | None:
     recognition = RecognitionService(resumes, dify_client.recognize)
     return RemoteServices(
         candidates, resumes, recognition,
-        ResumeCandidateService(resumes, recognition, candidates),
+        ResumeCandidateService(resumes, recognition, candidates), report,
     )
 
 
