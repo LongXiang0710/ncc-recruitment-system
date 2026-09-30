@@ -21,6 +21,20 @@
       "export": false
     },
     {
+      "key": "recognition_result",
+      "label": "识别结果",
+      "readonly": true,
+      "hidden": true,
+      "export": false
+    },
+    {
+      "key": "linked_candidate",
+      "label": "关联人才编号",
+      "readonly": true,
+      "hidden": true,
+      "export": false
+    },
+    {
       "key": "status",
       "label": "处理状态",
       "options": [

@@ -9,3 +9,5 @@ Pre-flight: Task 7 RemoteServices -> Tasks 9-11: consistent; runtime and migrati
 Pre-flight: Task 10 MigrationReport/digests -> Task 11 apply: consistent; apply revalidates both digests before any mutation.
 Task 1: complete (commits c71a7af..97b40ec, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 239 tests, OK)
 Task 2: complete (commits 97b40ec..9554273, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 244 tests, OK)
+Task 3: complete (commits 9554273..a58e5de, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 249 tests, OK)
+Task 4: complete (commits a58e5de..pending, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 254 tests, OK)
