@@ -60,7 +60,33 @@ def build_remote_services(data_dir: Path) -> RemoteServices | None:
         AttachmentRepository(client), candidate_schema,
     )
     resumes = RemoteResumeService(
-        ResumeRepository(client), ResumeAttachmentRepository(client), resume_schema,
+        ResumeRepository(client, report.resume_fields), ResumeAttachmentRepository(client), resume_schema,
+    )
+    recognition = RecognitionService(resumes, dify_client.recognize)
+    return RemoteServices(
+        candidates, resumes, recognition,
+        ResumeCandidateService(resumes, recognition, candidates), report,
+    )
+
+
+def build_migration_services(data_dir: Path) -> RemoteServices:
+    """Build preflighted services without requiring or changing the backend selector."""
+    import dify_client
+
+    data_dir = Path(data_dir)
+    client = NocoBaseClient(load(data_dir))
+    report = run_preflight(client)
+    if not report.ok:
+        raise ValueError("NocoBase只读预检未通过")
+    features_path = Path(__file__).parents[1]
+    candidate_schema = json.loads((features_path / "candidates" / "schema.json").read_text(encoding="utf-8"))
+    resume_schema = json.loads((features_path / "resume_documents" / "schema.json").read_text(encoding="utf-8"))
+    candidates = RemoteCandidateService(
+        CandidateRepository(client), RelationRepository(client, report.relation_fields),
+        AttachmentRepository(client), candidate_schema,
+    )
+    resumes = RemoteResumeService(
+        ResumeRepository(client, report.resume_fields), ResumeAttachmentRepository(client), resume_schema,
     )
     recognition = RecognitionService(resumes, dify_client.recognize)
     return RemoteServices(

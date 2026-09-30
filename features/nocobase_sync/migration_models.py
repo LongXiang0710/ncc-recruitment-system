@@ -50,3 +50,27 @@ class MigrationReport:
             "digests": dict(self.digests),
             "issues": [issue.redacted() for issue in self.issues],
         }
+
+    @classmethod
+    def from_redacted(cls, payload: dict) -> "MigrationReport":
+        if not isinstance(payload, dict):
+            raise ValueError("迁移检查报告格式无效")
+        try:
+            return cls(
+                generated_at=datetime.fromisoformat(payload["generated_at"]),
+                expires_at=datetime.fromisoformat(payload["expires_at"]),
+                eligible=payload["eligible"] is True,
+                counts={str(key): int(value) for key, value in payload["counts"].items()},
+                digests={str(key): str(value) for key, value in payload["digests"].items()},
+                issues=tuple(MigrationIssue(**item) for item in payload["issues"]),
+            )
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise ValueError("迁移检查报告格式无效") from error
+
+
+@dataclass(frozen=True)
+class MigrationResult:
+    candidate_ids: dict[int, int]
+    resume_ids: dict[int, int]
+    reference_updates: int
+    journal_path: str

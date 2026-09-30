@@ -12,6 +12,14 @@ from .migration_inventory import build_inventory
 from .migration_models import MigrationReport
 
 
+def load_report(path: Path) -> MigrationReport:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("迁移检查报告无法读取") from error
+    return MigrationReport.from_redacted(payload)
+
+
 def check_migration(sqlite_path: Path, services, *, now=None) -> MigrationReport:
     generated = (now or datetime.now)()
     inventory = build_inventory(sqlite_path, services)

@@ -117,19 +117,32 @@ def _validate_main_schema(schema: dict) -> None:
         raise _protocol()
 
 
-def _validate_resume_schema(schema: dict) -> None:
+def _validate_resume_schema(schema: dict) -> Mapping[str, str]:
     properties = schema["properties"]
     if not isinstance(properties.get("id"), dict) or properties["id"].get("type") != "integer":
         raise _protocol()
-    string_fields = set(RESUME_FIELDS.values()) - {"linked_candidate"}
+    required = {
+        "Number", "Processing_Status", "name", "Job_Type",
+        "Campus_recruitment_channels", "External_hiring_channels", "Details",
+        "Job", "Other_job_titles", "Creator", "time", "source_id",
+    }
     if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
-           for key in string_fields):
+           for key in required):
         raise _protocol()
     linked = properties.get("linked_candidate")
-    if (not isinstance(linked, dict)
+    if linked is not None and (not isinstance(linked, dict)
             or linked.get("x-association-type") != "belongsTo"
             or linked.get("x-target") != "campus_talent_pool"):
         raise _protocol()
+    resolved = {}
+    for local, remote in RESUME_FIELDS.items():
+        definition = properties.get(remote)
+        if not isinstance(definition, dict):
+            continue
+        if local != "linked_candidate" and definition.get("type") != "string":
+            raise _protocol()
+        resolved[local] = remote
+    return MappingProxyType(resolved)
 
 
 def _document(client: NocoBaseClient, namespace: str) -> tuple[dict, dict]:
@@ -216,7 +229,7 @@ def run_preflight(client: NocoBaseClient) -> PreflightReport:
         )
         if item.get("x-association-type") not in (None, "belongsToMany"):
             raise _protocol()
-    _validate_resume_schema(_schema(resume_schemas, "Resume_Collection"))
+    resume_fields = _validate_resume_schema(_schema(resume_schemas, "Resume_Collection"))
 
     return PreflightReport(
         ok=True,
@@ -224,5 +237,5 @@ def run_preflight(client: NocoBaseClient) -> PreflightReport:
                 "candidate-fields", "resume-collection", "resume-crud",
                 "resume-relation", "resume-fields"),
         relation_fields=relation_fields,
-        resume_fields=RESUME_FIELDS,
+        resume_fields=resume_fields,
     )

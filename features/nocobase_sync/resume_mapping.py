@@ -26,12 +26,13 @@ def _candidate_id(value):
     return value
 
 
-def to_nocobase_resume(values: dict) -> dict:
+def to_nocobase_resume(values: dict, fields=None) -> dict:
     if not isinstance(values, dict):
         raise TypeError("简历数据必须是对象。")
+    direct = fields or DIRECT_FIELDS
     result = {
         remote: values[local]
-        for local, remote in DIRECT_FIELDS.items()
+        for local, remote in direct.items()
         if local in values
     }
     if "channel" in values or "recruitment_type" in values:
@@ -45,12 +46,13 @@ def to_nocobase_resume(values: dict) -> dict:
     return result
 
 
-def from_nocobase_resume(row: dict) -> dict:
+def from_nocobase_resume(row: dict, fields=None) -> dict:
     if not isinstance(row, dict):
         raise TypeError("NocoBase 简历记录必须是对象。")
+    direct = fields or DIRECT_FIELDS
     result = {
         local: row.get(remote, "")
-        for local, remote in DIRECT_FIELDS.items()
+        for local, remote in direct.items()
     }
     result["id"] = row.get("id")
     result["linked_candidate"] = _candidate_id(row.get("linked_candidate"))

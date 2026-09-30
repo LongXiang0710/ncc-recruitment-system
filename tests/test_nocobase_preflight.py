@@ -214,18 +214,20 @@ class NocoBasePreflightTests(unittest.TestCase):
                 run_preflight(FakeClient(document))
             self.assertEqual(raised.exception.kind, "protocol")
 
-    def test_resume_technical_fields_and_relation_target_are_required(self):
+    def test_optional_resume_technical_fields_and_relation_target_are_validated(self):
         from features.nocobase_sync.preflight import run_preflight
 
         missing_hash = swagger_document()
         del missing_hash["components"]["schemas"]["Resume_Collection"]["properties"]["file_hash"]
+        report = run_preflight(FakeClient(missing_hash))
+        self.assertNotIn("file_hash", report.resume_fields)
         wrong_result = swagger_document()
         wrong_result["components"]["schemas"]["Resume_Collection"]["properties"]["recognition_result"]["type"] = "integer"
         wrong_target = swagger_document()
         wrong_target["components"]["schemas"]["Resume_Collection"]["properties"]["linked_candidate"]["x-target"] = "users"
         missing_attachment_action = swagger_document()
         del missing_attachment_action["paths"]["/Resume_Collection/{collectionIndex}/Resume:set"]
-        for document in (missing_hash, wrong_result, wrong_target, missing_attachment_action):
+        for document in (wrong_result, wrong_target, missing_attachment_action):
             with self.subTest(document=document):
                 with self.assertRaises(NocoBaseError) as raised:
                     run_preflight(FakeClient(document))

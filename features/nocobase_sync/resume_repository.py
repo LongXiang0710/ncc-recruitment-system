@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .client import NocoBaseClient, NocoBaseError
-from .resume_mapping import from_nocobase_resume, to_nocobase_resume
+from .resume_mapping import DIRECT_FIELDS, from_nocobase_resume, to_nocobase_resume
 
 
 class ResumeRepository:
@@ -15,8 +15,9 @@ class ResumeRepository:
         "linked_candidate": "linked_candidate",
     }
 
-    def __init__(self, client: NocoBaseClient):
+    def __init__(self, client: NocoBaseClient, fields=None):
         self.client = client
+        self.fields = dict(fields or DIRECT_FIELDS)
 
     @staticmethod
     def _identifier(value: int) -> int:
@@ -65,11 +66,11 @@ class ResumeRepository:
             return None
         if not isinstance(data, dict):
             raise NocoBaseError("protocol", None, endpoint)
-        return from_nocobase_resume(data)
+        return from_nocobase_resume(data, self.fields)
 
     def create(self, values: dict) -> int:
         endpoint = f"{self.COLLECTION}:create"
-        data = self.client.request(endpoint, method="POST", body=to_nocobase_resume(values))
+        data = self.client.request(endpoint, method="POST", body=to_nocobase_resume(values, self.fields))
         if not isinstance(data, dict) or type(data.get("id")) is not int:
             raise NocoBaseError("protocol", None, endpoint)
         return data["id"]
@@ -78,7 +79,7 @@ class ResumeRepository:
         self.client.request(
             f"{self.COLLECTION}:update", method="POST",
             params={"filterByTk": self._identifier(identifier)},
-            body=to_nocobase_resume(values),
+            body=to_nocobase_resume(values, self.fields),
         )
 
     def delete(self, identifier: int) -> bool:
@@ -92,6 +93,8 @@ class ResumeRepository:
         remote = self.STABLE_FIELDS.get(field)
         if remote is None:
             raise ValueError("不支持的简历稳定键")
+        if field not in self.fields:
+            return None
         if field == "linked_candidate":
             value = self._identifier(value)
             filter_value = {remote: {"id": {"$eq": value}}}
