@@ -83,6 +83,11 @@ def _handle(handler, method: str, identifier: str | None, query: dict):
         return handler.send(200, row) if row else handler.send(404, {"error": "记录不存在"})
     if method == "POST" and identifier is None:
         return handler.send(201, {"id": resumes.create(handler.body())})
+    if method == "POST" and identifier == "batch-import":
+        payload = handler.body()
+        items = payload.get("items") if isinstance(payload, dict) else None
+        identifiers = resumes.create_many(items)
+        return handler.send(201, {"count": len(identifiers), "ids": identifiers})
     if method == "PUT" and identifier and identifier.isdigit():
         resumes.update(int(identifier), handler.body())
         return handler.send(200, {"ok": True})
@@ -161,16 +166,28 @@ def handle_public_remote_resume_request(handler, method: str, kind: str) -> bool
         submitted = handler.body()
         if not isinstance(submitted, dict):
             raise ValueError("提交内容必须为对象")
-        payload = {
-            "recruitment_type": "校园招聘" if kind == "campus" else "社会招聘",
-            "channel": submitted.get("channel") or ("校园线下" if kind == "campus" else ""),
-            "channel_detail": submitted.get("channel_detail") or "",
-            "position": submitted.get("position") or "",
-            "position_detail": submitted.get("position_detail") or "",
-            "_resume_upload": submitted.get("_resume_upload"),
-        }
-        handler.server.remote_services.resumes.create_public(payload)
-        handler.send(201, {"ok": True})
+        def public_payload(item):
+            if not isinstance(item, dict):
+                raise ValueError("简历批量提交内容无效")
+            return {
+                "recruitment_type": "校园招聘" if kind == "campus" else "社会招聘",
+                "channel": item.get("channel") or ("校园线下" if kind == "campus" else ""),
+                "channel_detail": item.get("channel_detail") or "",
+                "position": item.get("position") or "",
+                "position_detail": item.get("position_detail") or "",
+                "_resume_upload": item.get("_resume_upload"),
+            }
+        if "items" in submitted:
+            items = submitted.get("items")
+            if not isinstance(items, list):
+                raise ValueError("简历批量提交内容无效")
+            identifiers = handler.server.remote_services.resumes.create_many(
+                [public_payload(item) for item in items], public=True,
+            )
+            handler.send(201, {"ok": True, "count": len(identifiers)})
+        else:
+            handler.server.remote_services.resumes.create_public(public_payload(submitted))
+            handler.send(201, {"ok": True})
     except NocoBaseError as error:
         status = 503 if error.kind in ("network", "remote", "disabled") else 502
         diagnostic_id = diagnostics.record("public-resume-api", status=error.status,

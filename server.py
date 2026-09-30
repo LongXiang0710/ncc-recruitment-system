@@ -34,6 +34,8 @@ from features.nocobase_sync.resume_http_adapter import (
     handle_remote_resume_request,
 )
 from features.nocobase_sync.backend import read_backend
+from features.nocobase_sync.client import NocoBaseError
+from features.nocobase_sync import diagnostics as nocobase_diagnostics
 from features.nocobase_sync.candidate_reference import (
     RemoteCandidateReference,
     upgrade_remote_candidate_foreign_keys,
@@ -886,6 +888,71 @@ def account_display_name(user, conn):
     row = conn.execute(f'SELECT nickname FROM {table} WHERE id=?', (user['id'],)).fetchone()
     return (row['nickname'] if row else '') or user['username']
 
+
+def load_remote_dashboard(remote_services):
+    """Read complete remote dashboard slices before opening a local transaction."""
+    return {
+        'candidates': remote_services.candidates.list_all(''),
+        'resume_documents': remote_services.resumes.list_all(''),
+    }
+
+
+def build_dashboard(conn, enabled_schemas, remote=None):
+    remote_entities = {'candidates', 'resume_documents'} if remote is not None else set()
+    counts = {
+        key: (len(remote[key]) if key in remote_entities else
+              conn.execute(f'SELECT COUNT(*) FROM {key}').fetchone()[0])
+        for key in enabled_schemas
+    }
+    if 'candidates' in enabled_schemas:
+        if remote is not None:
+            candidate_rows = [dict(row) for row in remote['candidates']]
+            status_counts = {}
+            for row in candidate_rows:
+                status = row.get('status') or ''
+                status_counts[status] = status_counts.get(status, 0) + 1
+            statuses = [{'status': status, 'count': count}
+                        for status, count in status_counts.items()]
+            ordered_candidates = sorted(candidate_rows, key=lambda row: row.get('id') or 0, reverse=True)
+            recent = [{key: row.get(key, '') for key in
+                       ('id', 'name', 'school_name', 'major', 'position', 'status', 'created_at')}
+                      for row in ordered_candidates[:5]]
+        else:
+            statuses = [dict(row) for row in conn.execute(
+                'SELECT status,COUNT(*) AS count FROM candidates GROUP BY status')]
+            recent = [dict(row) for row in conn.execute(
+                'SELECT id,name,school_name,major,position,status,created_at '
+                'FROM candidates ORDER BY id DESC LIMIT 5')]
+    else:
+        candidate_rows, statuses, recent = [], [], []
+    recruitment = {}
+    for kind in ('校园招聘', '社会招聘'):
+        if remote is not None:
+            grouped = {
+                key: sum(row.get('recruitment_type') == kind for row in remote[key])
+                for key in remote_entities if key in enabled_schemas
+            }
+            kind_recent = [{key: row.get(key, '') for key in
+                            ('id', 'name', 'school_name', 'major', 'position')}
+                           for row in sorted(
+                               (row for row in candidate_rows if row.get('recruitment_type') == kind),
+                               key=lambda row: row.get('id') or 0, reverse=True,
+                           )[:5]] if 'candidates' in enabled_schemas else []
+        else:
+            grouped = {key: conn.execute(
+                f'SELECT COUNT(*) FROM {key} WHERE recruitment_type=?', (kind,)
+            ).fetchone()[0] for key in ('resume_documents', 'candidates') if key in enabled_schemas}
+            kind_recent = [dict(row) for row in conn.execute(
+                'SELECT id,name,school_name,major,position FROM candidates '
+                'WHERE recruitment_type=? ORDER BY id DESC LIMIT 5', (kind,)
+            )] if 'candidates' in enabled_schemas else []
+        if kind == '校园招聘':
+            grouped.update({key: counts[key] for key in ('schools', 'applications', 'interviews')
+                            if key in enabled_schemas})
+        recruitment[kind] = {'counts': grouped, 'recent': kind_recent}
+    return {'counts': counts, 'statuses': statuses, 'recent': recent,
+            'recruitment': recruitment}
+
 def dify_embed_url():
     return FEATURES['resume_documents'].service.dify_embed_url()
 
@@ -1064,7 +1131,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def body(self):
         length = int(self.headers.get('Content-Length', 0))
-        limit = 280 * 1024 * 1024 if self.path.startswith(('/api/applications', '/api/interviews', '/api/public/apply')) else 70 * 1024 * 1024 if self.path.startswith(('/api/candidates', '/api/resume_documents', '/api/public/resumes/')) else 12 * 1024 * 1024 if self.path.split('?')[0].endswith('/import-preview') else 65536
+        limit = 280 * 1024 * 1024 if self.path.startswith(('/api/applications', '/api/interviews', '/api/public/apply', '/api/resume_documents/batch-import', '/api/public/resumes/')) else 70 * 1024 * 1024 if self.path.startswith(('/api/candidates', '/api/resume_documents')) else 12 * 1024 * 1024 if self.path.split('?')[0].endswith('/import-preview') else 65536
         if length > limit or length < 0:
             raise ValueError('提交内容过大')
         if self.headers.get_content_type() != 'application/json':
@@ -1111,6 +1178,13 @@ class Handler(BaseHTTPRequestHandler):
             elif 'employees.candidate_id' in str(exc):
                 message = '该应聘人已办理入职登记'
             self.send(409, {'error': message})
+        except NocoBaseError as exc:
+            status = 503 if exc.kind in ('network', 'remote', 'disabled') else 502
+            diagnostic_id = nocobase_diagnostics.record(
+                'mixed-api', status=exc.status, elapsed=0,
+                diagnostic_id=exc.diagnostic_id,
+            )
+            self.send(status, {'error': f'NocoBase 数据暂时不可用（诊断编号：{diagnostic_id}）'})
         except Exception:
             self.send(500, {'error': '服务暂时无法处理，请稍后重试'})
 
@@ -1626,18 +1700,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/locations' and method == 'GET':
                 return self.send(200, LOCATIONS)
             if path == '/api/stats' and method == 'GET':
+                remote = (load_remote_dashboard(self.server.remote_services)
+                          if getattr(self.server, 'remote_services', None) else None)
                 with db() as conn:
-                    counts = {key: conn.execute(f'SELECT COUNT(*) FROM {key}').fetchone()[0] for key in ENABLED_SCHEMAS}
-                    statuses = [dict(r) for r in conn.execute('SELECT status,COUNT(*) AS count FROM candidates GROUP BY status')] if 'candidates' in ENABLED_SCHEMAS else []
-                    recent = [dict(r) for r in conn.execute('SELECT id,name,school_name,major,position,status,created_at FROM candidates ORDER BY id DESC LIMIT 5')] if 'candidates' in ENABLED_SCHEMAS else []
-                    recruitment = {}
-                    for kind in ('校园招聘', '社会招聘'):
-                        grouped = {key: conn.execute(f'SELECT COUNT(*) FROM {key} WHERE recruitment_type=?', (kind,)).fetchone()[0] for key in ('resume_documents', 'candidates') if key in ENABLED_SCHEMAS}
-                        if kind == '校园招聘':
-                            grouped.update({key: counts[key] for key in ('schools', 'applications', 'interviews') if key in ENABLED_SCHEMAS})
-                        kind_recent = [dict(r) for r in conn.execute('SELECT id,name,school_name,major,position FROM candidates WHERE recruitment_type=? ORDER BY id DESC LIMIT 5', (kind,))] if 'candidates' in ENABLED_SCHEMAS else []
-                        recruitment[kind] = {'counts': grouped, 'recent': kind_recent}
-                return self.send(200, {'counts': counts, 'statuses': statuses, 'recent': recent, 'recruitment': recruitment})
+                    dashboard = build_dashboard(conn, ENABLED_SCHEMAS, remote)
+                return self.send(200, dashboard)
             parts = path.strip('/').split('/')
             entity = parts[1]
             if entity not in ENABLED_SCHEMAS or len(parts) > 3:

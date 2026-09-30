@@ -178,6 +178,37 @@ class RemoteResumeServiceTests(unittest.TestCase):
         self.assertEqual(result[2], "候选人.pdf")
         self.assertEqual(reads, [81])
 
+    def test_batch_create_validates_every_file_then_compensates_partial_failure(self):
+        from features.nocobase_sync.remote_resume_service import RemoteResumeService
+
+        resumes = FakeResumes()
+        attachments = FakeAttachments()
+        sources = iter(("SRC-1", "SRC-2", "SRC-3"))
+        service = RemoteResumeService(
+            resumes, attachments, SCHEMA,
+            now=lambda: datetime(2026, 9, 30, 8, 30), source_factory=lambda: next(sources),
+        )
+        duplicate = {"recruitment_type": "校园招聘", "channel": "校园平台",
+                     "_resume_upload": upload(name="一.pdf")}
+        with self.assertRaisesRegex(ValueError, "重复"):
+            service.create_many([duplicate, {**duplicate, "_resume_upload": upload(name="二.pdf")}])
+        self.assertEqual(resumes.rows, {})
+
+        original_replace = attachments.replace
+        def fail_second(identifier, value=None, remove=False):
+            if identifier == 2:
+                raise NocoBaseError("remote", 500, "batch upload")
+            return original_replace(identifier, value, remove)
+        attachments.replace = fail_second
+        with self.assertRaises(NocoBaseError):
+            service.create_many([
+                {"recruitment_type": "校园招聘", "channel": "校园平台",
+                 "_resume_upload": upload(content=b"%PDF-1.4\none", name="一.pdf")},
+                {"recruitment_type": "校园招聘", "channel": "校园平台",
+                 "_resume_upload": upload(content=b"%PDF-1.4\ntwo", name="二.pdf")},
+            ])
+        self.assertEqual(resumes.rows, {})
+
 
 if __name__ == "__main__":
     unittest.main()

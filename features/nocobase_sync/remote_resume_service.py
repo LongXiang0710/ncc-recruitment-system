@@ -219,6 +219,37 @@ class RemoteResumeService:
     def create_public(self, payload: dict) -> int:
         return self._create(payload, "公开投递")
 
+    def create_many(self, payloads: list[dict], *, public: bool = False) -> list[int]:
+        if not isinstance(payloads, list) or not 1 <= len(payloads) <= 100:
+            raise ValueError("请选择1至100份简历")
+        hashes = set()
+        for payload in payloads:
+            _upload, _filename, file_hash = self._upload(payload)
+            self._validate_user_values(payload)
+            if file_hash in hashes:
+                raise ValueError("批量导入中存在重复简历")
+            hashes.add(file_hash)
+            if self.resumes.find_by_stable_key("file_hash", file_hash) is not None:
+                raise ValueError("同一份简历已存在，请使用已有记录")
+        created = []
+        try:
+            for payload in payloads:
+                creator = "公开投递" if public else str(
+                    payload.get("created_by") or "管理员"
+                ).strip() or "管理员"
+                created.append(self._create(payload, creator))
+        except Exception:
+            compensation_failed = False
+            for identifier in reversed(created):
+                try:
+                    self._cleanup_created(identifier)
+                except Exception:
+                    compensation_failed = True
+            if compensation_failed:
+                raise RemoteResumeConsistencyError() from None
+            raise
+        return created
+
     def update(self, identifier: int, payload: dict) -> None:
         current = self.resumes.get(identifier)
         if current is None:

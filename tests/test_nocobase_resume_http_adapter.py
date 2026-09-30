@@ -18,6 +18,8 @@ class FakeResumes:
         self.calls.append(("get", identifier)); return self.rows.get(identifier)
     def create(self, payload):
         self.calls.append(("create", payload)); return 2
+    def create_many(self, payloads, *, public=False):
+        self.calls.append(("create_many", payloads, public)); return list(range(10, 10 + len(payloads)))
     def create_public(self, payload):
         self.calls.append(("create_public", payload))
         if self.failure:
@@ -53,7 +55,7 @@ class FakeHandler:
             remote_services=SimpleNamespace(
                 resumes=FakeResumes(), recognition=FakeRecognition(), resume_candidates=FakeLinks(),
             ),
-            resume_schema={"title": "简历收集", "fields": [{"key": "name", "label": "名称"}]},
+            resume_schema={"title": "简历收集", "short": "简历", "fields": [{"key": "name", "label": "名称"}]},
             server_port=8116,
         )
         self.headers = {"Host": "localhost:8116"}
@@ -87,6 +89,26 @@ class ResumeHttpAdapterTests(unittest.TestCase):
         self.assertEqual(self.call(handler, "POST", "batch-delete")[:2], (200, {"count": 1}))
         self.assertEqual(handler.server.remote_services.resume_candidates.deleted, ([1], None))
 
+    def test_batch_import_uses_atomic_remote_create_many(self):
+        items = [{"_resume_upload": {"name": "一.pdf"}},
+                 {"_resume_upload": {"name": "二.pdf"}}]
+        handler = FakeHandler([{"items": items}])
+        self.assertEqual(self.call(handler, "POST", "batch-import")[:2],
+                         (201, {"count": 2, "ids": [10, 11]}))
+        self.assertIn(("create_many", items, False), handler.server.remote_services.resumes.calls)
+
+    def test_export_and_qr_are_read_only(self):
+        handler = FakeHandler([{"ids": [1]}, {"ids": [1]}])
+        status, content, mime, _headers = self.call(handler, "POST", "export.xlsx")
+        self.assertEqual(status, 200)
+        self.assertTrue(content.startswith(b"PK"))
+        self.assertIn("spreadsheetml", mime)
+        status, result, *_ = self.call(handler, "POST", "qr-print")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["items"][0]["id"], 1)
+        mutations = {"create", "create_many", "update", "delete"}
+        self.assertFalse(any(call[0] in mutations for call in handler.server.remote_services.resumes.calls))
+
     def test_public_submission_uses_remote_service_and_ignores_forged_system_fields(self):
         from features.nocobase_sync.resume_http_adapter import handle_public_remote_resume_request
         handler = FakeHandler([{"status": "已入库", "linked_candidate": 8, "_resume_upload": {"name": "x.pdf"}}])
@@ -95,6 +117,18 @@ class ResumeHttpAdapterTests(unittest.TestCase):
         call = handler.server.remote_services.resumes.calls[-1]
         self.assertEqual(call[0], "create_public")
         self.assertEqual(call[1]["recruitment_type"], "社会招聘")
+
+    def test_public_batch_submission_is_atomic(self):
+        from features.nocobase_sync.resume_http_adapter import handle_public_remote_resume_request
+        items = [{"channel": "校园平台", "_resume_upload": {"name": "一.pdf"}},
+                 {"channel": "校园平台", "_resume_upload": {"name": "二.pdf"}}]
+        handler = FakeHandler([{"items": items}])
+        self.assertTrue(handle_public_remote_resume_request(handler, "POST", "campus"))
+        self.assertEqual(handler.responses[-1][:2], (201, {"ok": True, "count": 2}))
+        call = handler.server.remote_services.resumes.calls[-1]
+        self.assertEqual(call[0], "create_many")
+        self.assertTrue(call[2])
+        self.assertTrue(all(item["recruitment_type"] == "校园招聘" for item in call[1]))
 
     def test_public_remote_failure_is_sanitized(self):
         from features.nocobase_sync.client import NocoBaseError

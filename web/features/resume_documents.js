@@ -68,7 +68,7 @@ async function publicResumeCollection() {
 }
 
 function publicResumeBatch() {
-  app.innerHTML=`<main class="apply"><div class="identity"><div class="logo">N</div><div>南化建<strong>招聘管理系统</strong></div></div><div class="apply-title"><h1>批量导入简历</h1><p>无需登录。请选择招聘类型和招聘渠道，然后增加一份或多份简历文件。</p></div><section class="panel"><form><div class="panel-head"><h3>批量导入信息</h3></div><div class="form-grid"><label>招聘类型<span class="required"> *</span><select name="recruitment_type" required><option value="">请选择招聘类型</option><option>校园招聘</option><option>社会招聘</option></select></label><label>招聘渠道<span class="required"> *</span><select name="channel" required><option value="">请先选择招聘类型</option></select></label><label class="full conditional-hidden">其他渠道详情<span class="required"> *</span><input name="channel_detail" maxlength="100" placeholder="请填写具体招聘渠道"></label><div class="full resume-file-picker-area"><label>简历文件<span class="required"> *</span></label><input id="public-resume-file-picker" class="resume-file-picker" name="resume_files" type="file" accept="${RESUME_FILE_ACCEPT}" multiple><button type="button" class="secondary add-resume-files">＋ 增加文件</button><span class="hint resume-file-summary">尚未增加文件</span><span class="hint">${RESUME_FILE_FORMAT_HINT}</span><ul class="resume-selected-files"></ul></div></div><div class="import-body resume-import-result" aria-live="polite"></div><p class="error form-error" role="alert"></p><div class="dialog-foot"><button type="submit" class="primary" disabled>开始导入</button></div></form></section><p class="hint center">每份文件最大50MB；单份失败不会影响其他文件。</p></main>`;
+  app.innerHTML=`<main class="apply"><div class="identity"><div class="logo">N</div><div>南化建<strong>招聘管理系统</strong></div></div><div class="apply-title"><h1>批量导入简历</h1><p>无需登录。请选择招聘类型和招聘渠道，然后增加一份或多份简历文件。</p></div><section class="panel"><form><div class="panel-head"><h3>批量导入信息</h3></div><div class="form-grid"><label>招聘类型<span class="required"> *</span><select name="recruitment_type" required><option value="">请选择招聘类型</option><option>校园招聘</option><option>社会招聘</option></select></label><label>招聘渠道<span class="required"> *</span><select name="channel" required><option value="">请先选择招聘类型</option></select></label><label class="full conditional-hidden">其他渠道详情<span class="required"> *</span><input name="channel_detail" maxlength="100" placeholder="请填写具体招聘渠道"></label><div class="full resume-file-picker-area"><label>简历文件<span class="required"> *</span></label><input id="public-resume-file-picker" class="resume-file-picker" name="resume_files" type="file" accept="${RESUME_FILE_ACCEPT}" multiple><button type="button" class="secondary add-resume-files">＋ 增加文件</button><span class="hint resume-file-summary">尚未增加文件</span><span class="hint">${RESUME_FILE_FORMAT_HINT}</span><ul class="resume-selected-files"></ul></div></div><div class="import-body resume-import-result" aria-live="polite"></div><p class="error form-error" role="alert"></p><div class="dialog-foot"><button type="submit" class="primary" disabled>开始导入</button></div></form></section><p class="hint center">每份文件最大50MB；整批校验通过后统一写入，任一失败则全部不保留。</p></main>`;
   const form=app.querySelector('form'),fileInput=form.elements.resume_files,fileList=form.querySelector('.resume-selected-files'),submitButton=form.querySelector('[type=submit]');
   let selectedFiles=[],busy=false;
   bindRecruitmentChannel(form);
@@ -255,28 +255,36 @@ async function importResumeBatch(files,metadata,services={}) {
   const encodeFile=services.encodeFile;
   const request=services.request;
   if(typeof encodeFile!=='function' || typeof request!=='function')throw new Error('批量导入服务不可用');
-  const items=[];
+  const prepared=[];
   for(const file of files) {
-    let item;
     try {
       if(!isSupportedResumeFile(file))throw new Error('文件格式不支持');
       if(file.size>50*1024*1024)throw new Error('文件超过50MB');
       const content=await encodeFile(file);
-      await request(services.requestPath || 'resume_documents',{method:'POST',body:JSON.stringify({
+      prepared.push({name:file.name,payload:{
         name:file.name,
         position:String(file.position || inferResumePosition(file.name) || '').trim(),
         recruitment_type:metadata.recruitment_type,
         channel:metadata.channel,
         channel_detail:metadata.channel==='其他'?String(metadata.channel_detail || '').trim():'',
         _resume_upload:{name:file.name,content}
-      })});
-      item={name:file.name,status:'成功'};
+      }});
     } catch(error) {
-      item={name:file.name,status:'失败',error:error.message || '导入失败'};
+      prepared.push({name:file.name,error:error.message || '读取失败'});
     }
-    items.push(item);
-    services.onProgress?.(item,items.length,files.length);
   }
+  let items;
+  if(prepared.some(item=>item.error)) {
+    items=prepared.map(item=>({name:item.name,status:'失败',error:item.error || '本批次包含无效文件，未导入'}));
+  } else {
+    try {
+      await request(services.requestPath || 'resume_documents/batch-import',{method:'POST',body:JSON.stringify({items:prepared.map(item=>item.payload)})});
+      items=prepared.map(item=>({name:item.name,status:'成功'}));
+    } catch(error) {
+      items=prepared.map(item=>({name:item.name,status:'失败',error:error.message || '整批导入失败，未写入任何简历'}));
+    }
+  }
+  items.forEach((item,index)=>services.onProgress?.(item,index+1,items.length));
   return {total:items.length,succeeded:items.filter(item=>item.status==='成功').length,failed:items.filter(item=>item.status==='失败').length,items};
 }
 
@@ -301,7 +309,7 @@ function mergeResumeFiles(selected,incoming) {
 
 function openResumeImport() {
   let busy=false,selectedFiles=[];
-  dialog.innerHTML=`<form><div class="dialog-head"><div><div class="eyebrow">RESUME IMPORT</div><h2>批量导入简历</h2></div><button type="button" class="close" aria-label="关闭">×</button></div><div class="form-grid"><p class="hint full">本次选择的招聘类型和招聘渠道将应用于全部文件。每份文件最大50MB，成功文件会保存为“待识别”，失败文件不影响其他文件。</p><label>招聘类型<span class="required"> *</span><select name="recruitment_type" required><option value="">请选择招聘类型</option><option>校园招聘</option><option>社会招聘</option></select></label><label>招聘渠道<span class="required"> *</span><select name="channel" required><option value="">请先选择招聘类型</option></select></label><label class="full conditional-hidden">其他渠道详情<span class="required"> *</span><input name="channel_detail" maxlength="100" placeholder="请填写具体招聘渠道"></label><div class="full resume-file-picker-area"><label>简历文件<span class="required"> *</span></label><input id="resume-file-picker" class="resume-file-picker" name="resume_files" type="file" accept="${RESUME_FILE_ACCEPT}" multiple><button type="button" class="secondary add-resume-files">＋ 增加文件</button><span class="hint resume-file-summary">尚未增加文件</span><span class="hint">${RESUME_FILE_FORMAT_HINT}</span><ul class="resume-selected-files"></ul></div></div><div class="import-body resume-import-result" aria-live="polite"></div><p class="error form-error" role="alert"></p><div class="dialog-foot"><button type="button" class="secondary cancel">取消</button><button type="submit" class="primary" disabled>开始导入</button></div></form>`;
+  dialog.innerHTML=`<form><div class="dialog-head"><div><div class="eyebrow">RESUME IMPORT</div><h2>批量导入简历</h2></div><button type="button" class="close" aria-label="关闭">×</button></div><div class="form-grid"><p class="hint full">本次选择的招聘类型和招聘渠道将应用于全部文件。每份文件最大50MB；整批校验通过后统一写入，任一文件失败时本批次不会保留部分数据。</p><label>招聘类型<span class="required"> *</span><select name="recruitment_type" required><option value="">请选择招聘类型</option><option>校园招聘</option><option>社会招聘</option></select></label><label>招聘渠道<span class="required"> *</span><select name="channel" required><option value="">请先选择招聘类型</option></select></label><label class="full conditional-hidden">其他渠道详情<span class="required"> *</span><input name="channel_detail" maxlength="100" placeholder="请填写具体招聘渠道"></label><div class="full resume-file-picker-area"><label>简历文件<span class="required"> *</span></label><input id="resume-file-picker" class="resume-file-picker" name="resume_files" type="file" accept="${RESUME_FILE_ACCEPT}" multiple><button type="button" class="secondary add-resume-files">＋ 增加文件</button><span class="hint resume-file-summary">尚未增加文件</span><span class="hint">${RESUME_FILE_FORMAT_HINT}</span><ul class="resume-selected-files"></ul></div></div><div class="import-body resume-import-result" aria-live="polite"></div><p class="error form-error" role="alert"></p><div class="dialog-foot"><button type="button" class="secondary cancel">取消</button><button type="submit" class="primary" disabled>开始导入</button></div></form>`;
   tableLayout.floatDialogClose(dialog);
   const form=dialog.querySelector('form');
   const close=()=>{if(!busy)dialog.close();};

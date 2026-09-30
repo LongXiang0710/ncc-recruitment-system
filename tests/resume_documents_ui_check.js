@@ -148,19 +148,19 @@ assert.strictEqual(ui.canRecognizeResume({status:'已入库'}),false);
     request:async(path,options)=>{
       const payload=JSON.parse(options.body);
       uploaded.push([path,payload]);
-      if(payload.name==='重复简历.pdf')throw new Error('该 PDF 已存在');
+      if(payload.items.some(item=>item.name==='重复简历.pdf'))throw new Error('该 PDF 已存在');
       return {id:uploaded.length};
     },
     onProgress:item=>progress.push(item)
   });
-  assert.deepStrictEqual(uploaded.map(item=>item[0]),['resume_documents','resume_documents','resume_documents']);
-  assert.deepStrictEqual(uploaded[0][1],{
+  assert.deepStrictEqual(uploaded.map(item=>item[0]),['resume_documents/batch-import']);
+  assert.deepStrictEqual(uploaded[0][1].items[0],{
     name:'校园简历.pdf',position:'',recruitment_type:'社会招聘',channel:'智联招聘',channel_detail:'',
     _resume_upload:{name:'校园简历.pdf',content:'encoded-校园简历.pdf'}
   });
-  assert.strictEqual(batch.succeeded,2);
-  assert.strictEqual(batch.failed,1);
-  assert.deepStrictEqual(batch.items.map(item=>item.status),['成功','失败','成功']);
+  assert.strictEqual(batch.succeeded,0);
+  assert.strictEqual(batch.failed,3);
+  assert.deepStrictEqual(batch.items.map(item=>item.status),['失败','失败','失败']);
   assert.match(batch.items[1].error,/已存在/);
   assert.strictEqual(progress.length,3);
 
@@ -175,10 +175,10 @@ assert.strictEqual(ui.canRecognizeResume({status:'已入库'}),false);
     }
   );
   assert.strictEqual(publicBatch.succeeded,1);
-  assert.deepStrictEqual(publicCalls,[['public/resumes/campus',{
+  assert.deepStrictEqual(publicCalls,[['public/resumes/campus',{items:[{
     name:'公开简历.pdf',position:'',recruitment_type:'校园招聘',channel:'校园平台',channel_detail:'',
     _resume_upload:{name:'公开简历.pdf',content:'public-pdf'}
-  }]]);
+  }]}]]);
 
   const invalidBatch=await ui.importResumeBatch([
     {name:'错误格式.exe',size:100},
