@@ -85,6 +85,9 @@ class RemoteCandidateService:
     def validate(self, payload: dict) -> dict:
         return self._validate(payload)
 
+    def find_by_phone(self, phone: str) -> dict | None:
+        return self.candidates.find_by_phone(phone)
+
     def read_attachment(self, identifier: int) -> tuple[bytes, str, str]:
         return self.attachments.read(identifier)
 
@@ -133,6 +136,24 @@ class RemoteCandidateService:
 
     def create(self, payload: dict) -> int:
         return self._create_validated(self._validate(payload))
+
+    def create_from_resume(self, payload: dict, attachment_snapshot: list[dict]) -> int:
+        if not isinstance(attachment_snapshot, list) or any(
+            not isinstance(row, dict) or type(row.get("id")) is not int
+            for row in attachment_snapshot
+        ):
+            raise ValueError("简历附件快照无效")
+        values = self._validate(payload)
+        identifier = self._create_validated(values)
+        try:
+            self.attachments.restore(identifier, attachment_snapshot)
+        except Exception:
+            self._cleanup_created(identifier)
+            raise
+        return identifier
+
+    def rollback_created(self, identifier: int) -> None:
+        self._cleanup_created(identifier)
 
     def create_many(self, payloads: list[dict]) -> list[int]:
         if not isinstance(payloads, list) or not payloads:

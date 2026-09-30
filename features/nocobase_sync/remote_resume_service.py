@@ -23,7 +23,8 @@ class RemoteResumeConsistencyError(RuntimeError):
 class RemoteResumeService:
     SNAPSHOT_FIELDS = (
         "updated_at", "status", "resume", "source_id", "file_hash",
-        "recruitment_type", "channel", "channel_detail", "position", "position_detail",
+        "archive_no", "linked_candidate", "recognition_result", "recruitment_type",
+        "channel", "channel_detail", "position", "position_detail",
     )
     SYSTEM_FIELDS = {
         "id", "archive_no", "source_id", "file_hash", "status", "recognition_result",
@@ -89,6 +90,32 @@ class RemoteResumeService:
         if result is not None:
             values["recognition_result"] = result
         self.resumes.update(identifier, values)
+        return True
+
+    def link_candidate(self, identifier: int, snapshot: dict, candidate_id: int) -> bool:
+        if type(candidate_id) is not int or candidate_id <= 0:
+            raise ValueError("人才记录编号无效")
+        current = self.get(identifier)
+        if current is None or self.recognition_snapshot(current) != snapshot:
+            return False
+        self.resumes.update(identifier, {
+            "linked_candidate": candidate_id,
+            "status": "已入库",
+        })
+        return True
+
+    def restore_link(self, identifier: int, snapshot: dict) -> None:
+        self.resumes.update(identifier, {
+            "linked_candidate": snapshot.get("linked_candidate"),
+            "status": snapshot.get("status") or "已识别",
+        })
+
+    def delete_one(self, identifier: int) -> bool:
+        attachments = self.attachments.list(identifier)
+        if not self.resumes.delete(identifier):
+            return False
+        for attachment in attachments:
+            self.attachments.delete_if_unreferenced(attachment["id"])
         return True
 
     def _fields(self) -> dict[str, dict]:

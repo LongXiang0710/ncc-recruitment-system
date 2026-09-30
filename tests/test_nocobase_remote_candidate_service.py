@@ -277,6 +277,17 @@ class RemoteCandidateServiceTests(unittest.TestCase):
         self.assertEqual(service.delete([1], preview["details"]), 1)
         self.assertNotIn(1, candidates.records)
 
+    def test_find_by_phone_and_create_from_resume_reuse_the_existing_attachment(self):
+        service, candidates, relations, attachments = self.service()
+        self.assertIsNone(service.find_by_phone("13900000009"))
+        identifier = service.create_from_resume(
+            candidate("13900000009"), [{"id": 81, "filename": "来源.pdf"}],
+        )
+        self.assertEqual(service.find_by_phone("13900000009")["id"], identifier)
+        self.assertEqual(attachments.rows[identifier][0]["id"], 81)
+        service.rollback_created(identifier)
+        self.assertNotIn(identifier, candidates.records)
+
 
 if __name__ == "__main__":
     unittest.main()

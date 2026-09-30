@@ -68,6 +68,7 @@ class AttachmentRepositoryTests(unittest.TestCase):
                 [{"id": 4, "filename": "旧.pdf"}],
                 {},
                 [],
+                [],
                 1,
             ],
             upload_response={"id": 9, "filename": "新简历.pdf", "url": "/uploads/9.pdf"},
@@ -91,6 +92,11 @@ class AttachmentRepositoryTests(unittest.TestCase):
             },
         ))
         self.assertEqual(client.calls[4], (
+            "request", "Resume_Collection:list", {
+                "params": {"pageSize": 1, "filter": {"Resume": {"id": {"$eq": 4}}}},
+            },
+        ))
+        self.assertEqual(client.calls[5], (
             "request", "attachments:destroy", {"method": "POST", "params": {"filterByTk": 4}},
         ))
 
@@ -142,7 +148,11 @@ class AttachmentRepositoryTests(unittest.TestCase):
         self.assertFalse(self.repository(shared).delete_if_unreferenced(5))
         self.assertEqual(len(shared.calls), 1)
 
-        orphan = FakeClient(responses=[[], 1])
+        resume_shared = FakeClient(responses=[[], [{"id": 8}]])
+        self.assertFalse(self.repository(resume_shared).delete_if_unreferenced(5))
+        self.assertEqual(resume_shared.calls[-1][1], "Resume_Collection:list")
+
+        orphan = FakeClient(responses=[[], [], 1])
         self.assertTrue(self.repository(orphan).delete_if_unreferenced(5))
         self.assertEqual(orphan.calls[-1][1], "attachments:destroy")
 

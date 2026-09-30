@@ -147,15 +147,18 @@ class AttachmentRepository:
 
     def delete_if_unreferenced(self, attachment_id: int) -> bool:
         attachment_id = self._identifier(attachment_id)
-        endpoint = "campus_talent_pool:list"
-        references = self.client.request(endpoint, params={
-            "pageSize": 1,
-            "filter": {"biographical_notes": {"id": {"$eq": attachment_id}}},
-        })
-        if not isinstance(references, list):
-            raise self._protocol(endpoint)
-        if references:
-            return False
+        for endpoint, relation in (
+            ("campus_talent_pool:list", "biographical_notes"),
+            ("Resume_Collection:list", "Resume"),
+        ):
+            references = self.client.request(endpoint, params={
+                "pageSize": 1,
+                "filter": {relation: {"id": {"$eq": attachment_id}}},
+            })
+            if not isinstance(references, list):
+                raise self._protocol(endpoint)
+            if references:
+                return False
         deleted = self.client.request(
             "attachments:destroy", method="POST", params={"filterByTk": attachment_id},
         )
