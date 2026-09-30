@@ -81,10 +81,10 @@ def _crypt(data: bytes, function_name: str) -> bytes:
     crypt32, kernel32 = _windows_crypto()
 
     class DATA_BLOB(ctypes.Structure):
-        _fields_ = [("cbData", ctypes.c_uint32), ("pbData", ctypes.POINTER(ctypes.c_byte))]
+        _fields_ = [("cbData", ctypes.c_uint32), ("pbData", ctypes.POINTER(ctypes.c_char))]
 
     input_buffer = ctypes.create_string_buffer(data)
-    input_blob = DATA_BLOB(len(data), ctypes.cast(input_buffer, ctypes.POINTER(ctypes.c_byte)))
+    input_blob = DATA_BLOB(len(data), ctypes.cast(input_buffer, ctypes.POINTER(ctypes.c_char)))
     output_blob = DATA_BLOB()
     crypt_function = getattr(crypt32, function_name)
     description_argument = ctypes.c_wchar_p if function_name == "CryptProtectData" else ctypes.POINTER(ctypes.c_wchar_p)
@@ -107,7 +107,7 @@ def _crypt(data: bytes, function_name: str) -> bytes:
             raise _DPAPIUnavailable(
                 f"Windows DPAPI 无法使用（错误 {error_code}），请在已加载用户配置文件的 Windows 帐户下重新配置。"
             )
-        return ctypes.string_at(output_blob.pbData, output_blob.cbData)
+        return bytes(output_blob.pbData[:int(output_blob.cbData)])
     finally:
         if output_blob.pbData:
             kernel32.LocalFree(ctypes.cast(output_blob.pbData, ctypes.c_void_p))

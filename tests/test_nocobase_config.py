@@ -127,7 +127,7 @@ class NocoBaseConfigTests(unittest.TestCase):
 
         def unprotect(_input, _description, _entropy, _reserved, _prompt, _flags, output):
             output._obj.cbData = 5
-            output._obj.pbData = ctypes.cast(plaintext, ctypes.POINTER(ctypes.c_byte))
+            output._obj.pbData = ctypes.cast(plaintext, ctypes.POINTER(ctypes.c_char))
             return 1
 
         crypt32.CryptUnprotectData.side_effect = unprotect
