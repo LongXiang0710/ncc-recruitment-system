@@ -1,4 +1,4 @@
-"""Tests for explicit, fail-safe candidate backend selection."""
+"""Tests for explicit, fail-safe recruitment backend selection."""
 
 import json
 import unittest
@@ -16,7 +16,7 @@ class CandidateBackendTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             data_dir = Path(directory)
             self.assertEqual(backend.read_backend(data_dir), "sqlite")
-            path = data_dir / "candidate-backend.json"
+            path = data_dir / "recruitment-backend.json"
             for content in ("not-json", '{"version":1,"backend":"other"}', '{"version":2,"backend":"nocobase"}'):
                 path.write_text(content, encoding="utf-8")
                 self.assertEqual(backend.read_backend(data_dir), "sqlite")
@@ -39,11 +39,11 @@ class CandidateBackendTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             data_dir = Path(directory)
             backend.write_backend(data_dir, "sqlite")
-            original = (data_dir / "candidate-backend.json").read_bytes()
+            original = (data_dir / "recruitment-backend.json").read_bytes()
             with patch.object(backend, "load", return_value=NocoBaseConfig("https://example.test", "token", True)):
                 with self.assertRaises(RuntimeError):
                     backend.enable_nocobase(data_dir, lambda: (_ for _ in ()).throw(RuntimeError("offline")))
-            self.assertEqual((data_dir / "candidate-backend.json").read_bytes(), original)
+            self.assertEqual((data_dir / "recruitment-backend.json").read_bytes(), original)
 
     def test_successful_enable_is_atomic_and_persistent(self):
         with TemporaryDirectory() as directory:
@@ -53,10 +53,18 @@ class CandidateBackendTests(unittest.TestCase):
                 backend.enable_nocobase(data_dir, lambda: calls.append("checked") or SimpleNamespace(ok=True))
             self.assertEqual(calls, ["checked"])
             self.assertEqual(backend.read_backend(data_dir), "nocobase")
-            self.assertEqual(json.loads((data_dir / "candidate-backend.json").read_text(encoding="utf-8")), {
+            self.assertEqual(json.loads((data_dir / "recruitment-backend.json").read_text(encoding="utf-8")), {
                 "version": 1, "backend": "nocobase",
             })
-            self.assertFalse(any(path.name.startswith(".candidate-backend-") for path in data_dir.iterdir()))
+            self.assertFalse(any(path.name.startswith(".recruitment-backend-") for path in data_dir.iterdir()))
+
+    def test_legacy_candidate_only_selector_never_enables_unified_backend(self):
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            (data_dir / "candidate-backend.json").write_text(
+                '{"version":1,"backend":"nocobase"}', encoding="utf-8"
+            )
+            self.assertEqual(backend.read_backend(data_dir), "sqlite")
 
     def test_select_only_returns_nocobase_after_runtime_check(self):
         with TemporaryDirectory() as directory:

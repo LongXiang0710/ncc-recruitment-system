@@ -12,6 +12,7 @@ from .client import NocoBaseClient, NocoBaseError
 
 ENDPOINT = "swagger:get"
 NAMESPACE = "collections/campus_talent_pool"
+RESUME_NAMESPACE = "collections/Resume_Collection"
 
 RELATIONS = {
     "Education_Background": "hasMany",
@@ -54,6 +55,24 @@ DATE_FIELDS = {
 }
 ALLOWED_DATE_FORMATS = {None, "date", "date-time", "month", "year-month"}
 
+RESUME_FIELDS = MappingProxyType({
+    "archive_no": "Number",
+    "status": "Processing_Status",
+    "name": "name",
+    "recruitment_type": "Job_Type",
+    "campus_channel": "Campus_recruitment_channels",
+    "social_channel": "External_hiring_channels",
+    "channel_detail": "Details",
+    "position": "Job",
+    "position_detail": "Other_job_titles",
+    "created_by": "Creator",
+    "created_at": "time",
+    "source_id": "source_id",
+    "file_hash": "file_hash",
+    "recognition_result": "recognition_result",
+    "linked_candidate": "linked_candidate",
+})
+
 
 @dataclass(frozen=True)
 class RelationFieldMap:
@@ -67,6 +86,7 @@ class PreflightReport:
     ok: bool
     checks: tuple[str, ...]
     relation_fields: RelationFieldMap
+    resume_fields: Mapping[str, str]
 
 
 def _protocol() -> NocoBaseError:
@@ -95,6 +115,33 @@ def _validate_main_schema(schema: dict) -> None:
     properties = schema["properties"]
     if not isinstance(properties.get("id"), dict) or properties["id"].get("type") != "integer":
         raise _protocol()
+
+
+def _validate_resume_schema(schema: dict) -> None:
+    properties = schema["properties"]
+    if not isinstance(properties.get("id"), dict) or properties["id"].get("type") != "integer":
+        raise _protocol()
+    string_fields = set(RESUME_FIELDS.values()) - {"linked_candidate"}
+    if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
+           for key in string_fields):
+        raise _protocol()
+    linked = properties.get("linked_candidate")
+    if (not isinstance(linked, dict)
+            or linked.get("x-association-type") != "belongsTo"
+            or linked.get("x-target") != "campus_talent_pool"):
+        raise _protocol()
+
+
+def _document(client: NocoBaseClient, namespace: str) -> tuple[dict, dict]:
+    document = client.request(ENDPOINT, params={"ns": namespace})
+    if not isinstance(document, dict):
+        raise _protocol()
+    paths = document.get("paths")
+    components = document.get("components")
+    schemas = components.get("schemas") if isinstance(components, dict) else None
+    if not isinstance(paths, dict) or not isinstance(schemas, dict) or not schemas:
+        raise _protocol()
+    return paths, schemas
     required = set(LOCAL_TO_REMOTE.values()) | {"channel", "Social_recruitment_channels"}
     if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
            for key in required):
@@ -124,13 +171,7 @@ def _resolve_fields(relation: str, schema: dict) -> Mapping[str, str]:
 
 def run_preflight(client: NocoBaseClient) -> PreflightReport:
     """Read and validate Swagger metadata without issuing any mutation request."""
-    document = client.request(ENDPOINT, params={"ns": NAMESPACE})
-    if not isinstance(document, dict):
-        raise _protocol()
-    paths = document.get("paths")
-    schemas = document.get("components", {}).get("schemas") if isinstance(document.get("components"), dict) else None
-    if not isinstance(paths, dict) or not isinstance(schemas, dict) or not schemas:
-        raise _protocol()
+    paths, schemas = _document(client, NAMESPACE)
 
     for action in ("list", "get", "create", "update", "destroy"):
         method = "get" if action in ("list", "get") else "post"
@@ -159,8 +200,29 @@ def run_preflight(client: NocoBaseClient) -> PreflightReport:
         work=_resolve_fields("Work_experience", relation_schemas["Work_experience"]),
         project=_resolve_fields("Project_Experience", relation_schemas["Project_Experience"]),
     )
+    resume_paths, resume_schemas = _document(client, RESUME_NAMESPACE)
+    for action in ("list", "get", "create", "update", "updateOrCreate", "destroy"):
+        method = "get" if action in ("list", "get") else "post"
+        _operation(resume_paths, f"/Resume_Collection:{action}", method)
+    resume_relation = _schema(resume_schemas, "Resume_Collection.Resume")
+    if resume_relation.get("x-association-type") not in (None, "belongsToMany"):
+        raise _protocol()
+    for action in ("list", "get", "create", "update", "destroy", "set", "remove", "toggle"):
+        method = "get" if action in ("list", "get") else "post"
+        item = _operation(
+            resume_paths,
+            f"/Resume_Collection/{{collectionIndex}}/Resume:{action}",
+            method,
+        )
+        if item.get("x-association-type") not in (None, "belongsToMany"):
+            raise _protocol()
+    _validate_resume_schema(_schema(resume_schemas, "Resume_Collection"))
+
     return PreflightReport(
         ok=True,
-        checks=("collection", "crud", "relations", "main-fields", "relation-fields"),
+        checks=("candidate-collection", "candidate-crud", "candidate-relations",
+                "candidate-fields", "resume-collection", "resume-crud",
+                "resume-relation", "resume-fields"),
         relation_fields=relation_fields,
+        resume_fields=RESUME_FIELDS,
     )

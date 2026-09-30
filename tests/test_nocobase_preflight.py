@@ -23,6 +23,15 @@ def swagger_document():
                 "x-association-type": association,
                 "get" if action in ("list", "get") else "post": {"responses": {"200": {}}},
             }
+    for action in ("list", "get", "create", "update", "updateOrCreate", "destroy"):
+        paths[f"/Resume_Collection:{action}"] = {
+            "get" if action in ("list", "get") else "post": {"responses": {"200": {}}}
+        }
+    for action in ("list", "get", "create", "update", "destroy", "set", "remove", "toggle"):
+        paths[f"/Resume_Collection/{{collectionIndex}}/Resume:{action}"] = {
+            "x-association-type": "belongsToMany",
+            "get" if action in ("list", "get") else "post": {"responses": {"200": {}}},
+        }
     def fields(items):
         return {key: {"type": "string", "title": title, **extra} for key, title, extra in items}
     schemas = {
@@ -75,6 +84,34 @@ def swagger_document():
                 "id": {"type": "integer", "title": "ID"},
             },
         },
+        "Resume_Collection": {
+            "type": "object", "properties": {
+                "id": {"type": "integer", "title": "ID"},
+                "Number": {"type": "string", "title": "档案编号"},
+                "Processing_Status": {"type": "string", "title": "处理状态"},
+                "name": {"type": "string", "title": "简历名称"},
+                "Job_Type": {"type": "string", "title": "招聘类型"},
+                "Campus_recruitment_channels": {"type": "string", "title": "校园招聘渠道"},
+                "External_hiring_channels": {"type": "string", "title": "社会招聘渠道"},
+                "Details": {"type": "string", "title": "其他渠道详情"},
+                "Job": {"type": "string", "title": "应聘岗位"},
+                "Other_job_titles": {"type": "string", "title": "其他岗位名称"},
+                "Creator": {"type": "string", "title": "创建人"},
+                "time": {"type": "string", "title": "上传时间", "format": "date-time"},
+                "source_id": {"type": "string", "title": "来源编号"},
+                "file_hash": {"type": "string", "title": "文件指纹"},
+                "recognition_result": {"type": "string", "title": "识别结果"},
+                "linked_candidate": {
+                    "type": "object", "title": "关联人才", "x-association-type": "belongsTo",
+                    "x-target": "campus_talent_pool",
+                },
+            },
+        },
+        "Resume_Collection.Resume": {
+            "type": "object", "x-association-type": "belongsToMany", "properties": {
+                "id": {"type": "integer", "title": "ID"},
+            },
+        },
     }
     return {"openapi": "3.0.0", "paths": paths, "components": {"schemas": schemas}}
 
@@ -111,8 +148,19 @@ class NocoBasePreflightTests(unittest.TestCase):
             "start_date": "project_start_key", "end_date": "project_end_key",
             "description": "project_description_key",
         })
-        self.assertEqual(client.calls, [("swagger:get", {"params": {"ns": "collections/campus_talent_pool"}})])
-        self.assertTrue(all(word not in client.calls[0][0] for word in ("create", "update", "destroy", "set", "toggle")))
+        self.assertEqual(dict(report.resume_fields), {
+            "archive_no": "Number", "status": "Processing_Status", "name": "name",
+            "recruitment_type": "Job_Type", "campus_channel": "Campus_recruitment_channels",
+            "social_channel": "External_hiring_channels", "channel_detail": "Details",
+            "position": "Job", "position_detail": "Other_job_titles", "created_by": "Creator",
+            "created_at": "time", "source_id": "source_id", "file_hash": "file_hash",
+            "recognition_result": "recognition_result", "linked_candidate": "linked_candidate",
+        })
+        self.assertEqual(client.calls, [
+            ("swagger:get", {"params": {"ns": "collections/campus_talent_pool"}}),
+            ("swagger:get", {"params": {"ns": "collections/Resume_Collection"}}),
+        ])
+        self.assertTrue(all("method" not in kwargs for _, kwargs in client.calls))
         with self.assertRaises(TypeError):
             report.relation_fields.education["education"] = "changed"
 
@@ -165,6 +213,23 @@ class NocoBasePreflightTests(unittest.TestCase):
             with self.subTest(document=document), self.assertRaises(NocoBaseError) as raised:
                 run_preflight(FakeClient(document))
             self.assertEqual(raised.exception.kind, "protocol")
+
+    def test_resume_technical_fields_and_relation_target_are_required(self):
+        from features.nocobase_sync.preflight import run_preflight
+
+        missing_hash = swagger_document()
+        del missing_hash["components"]["schemas"]["Resume_Collection"]["properties"]["file_hash"]
+        wrong_result = swagger_document()
+        wrong_result["components"]["schemas"]["Resume_Collection"]["properties"]["recognition_result"]["type"] = "integer"
+        wrong_target = swagger_document()
+        wrong_target["components"]["schemas"]["Resume_Collection"]["properties"]["linked_candidate"]["x-target"] = "users"
+        missing_attachment_action = swagger_document()
+        del missing_attachment_action["paths"]["/Resume_Collection/{collectionIndex}/Resume:set"]
+        for document in (missing_hash, wrong_result, wrong_target, missing_attachment_action):
+            with self.subTest(document=document):
+                with self.assertRaises(NocoBaseError) as raised:
+                    run_preflight(FakeClient(document))
+                self.assertEqual(raised.exception.kind, "protocol")
 
 
 if __name__ == "__main__":

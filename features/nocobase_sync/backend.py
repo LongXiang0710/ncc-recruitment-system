@@ -1,4 +1,4 @@
-"""Fail-safe selection of the talent-library data backend."""
+"""Fail-safe selection of the unified recruitment data backend."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Callable, Literal
 from .config import load
 
 
-BACKEND_FILENAME = "candidate-backend.json"
+BACKEND_FILENAME = "recruitment-backend.json"
 BACKEND_VERSION = 1
 BackendName = Literal["sqlite", "nocobase"]
 
@@ -40,7 +40,7 @@ def write_backend(data_dir: Path, value: BackendName) -> None:
     try:
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", dir=destination.parent,
-            prefix=".candidate-backend-", suffix=".tmp", delete=False,
+            prefix=".recruitment-backend-", suffix=".tmp", delete=False,
         ) as temporary:
             temporary_name = temporary.name
             json.dump({"version": BACKEND_VERSION, "backend": value}, temporary,
@@ -67,7 +67,7 @@ def _require_config(data_dir: Path):
 def _require_preflight(preflight: Callable[[], object]) -> object:
     report = preflight()
     if getattr(report, "ok", False) is not True:
-        raise ValueError("NocoBase 只读预检未通过，人才库未启用。")
+        raise ValueError("NocoBase 只读预检未通过，简历收集和人才库未启用。")
     return report
 
 
