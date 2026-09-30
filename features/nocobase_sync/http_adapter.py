@@ -8,6 +8,7 @@ import io
 import json
 import secrets
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
@@ -25,24 +26,52 @@ from .config import load
 from .preflight import run_preflight
 from .relation_repository import RelationRepository
 from .remote_candidate_service import RemoteCandidateConsistencyError, RemoteCandidateService
+from .resume_attachment_repository import ResumeAttachmentRepository
+from .resume_candidate_service import ResumeCandidateService
+from .resume_repository import ResumeRepository
+from .remote_resume_service import RemoteResumeService
+from .recognition_service import RecognitionService
 
 
-def build_candidate_service(data_dir: Path) -> RemoteCandidateService | None:
-    """Build exactly one backend at startup; sqlite mode performs no API work."""
+@dataclass(frozen=True)
+class RemoteServices:
+    candidates: RemoteCandidateService
+    resumes: RemoteResumeService
+    recognition: RecognitionService
+    resume_candidates: ResumeCandidateService
+
+
+def build_remote_services(data_dir: Path) -> RemoteServices | None:
+    """Build and preflight the complete remote backend as one indivisible unit."""
+    import dify_client
+
     data_dir = Path(data_dir)
     if read_backend(data_dir) != "nocobase":
         return None
     client = NocoBaseClient(load(data_dir))
     report = run_preflight(client)
     select_candidate_backend(data_dir, preflight=lambda: report)
-    schema_path = Path(__file__).parents[1] / "candidates" / "schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    return RemoteCandidateService(
-        CandidateRepository(client),
-        RelationRepository(client, report.relation_fields),
-        AttachmentRepository(client),
-        schema,
+    features_path = Path(__file__).parents[1]
+    candidate_schema = json.loads((features_path / "candidates" / "schema.json").read_text(encoding="utf-8"))
+    resume_schema = json.loads((features_path / "resume_documents" / "schema.json").read_text(encoding="utf-8"))
+    candidates = RemoteCandidateService(
+        CandidateRepository(client), RelationRepository(client, report.relation_fields),
+        AttachmentRepository(client), candidate_schema,
     )
+    resumes = RemoteResumeService(
+        ResumeRepository(client), ResumeAttachmentRepository(client), resume_schema,
+    )
+    recognition = RecognitionService(resumes, dify_client.recognize)
+    return RemoteServices(
+        candidates, resumes, recognition,
+        ResumeCandidateService(resumes, recognition, candidates),
+    )
+
+
+def build_candidate_service(data_dir: Path) -> RemoteCandidateService | None:
+    """Compatibility helper for callers that only consume the candidate service."""
+    services = build_remote_services(data_dir)
+    return services.candidates if services else None
 
 
 def _query_value(query: dict, key: str, default: str = "") -> str:
@@ -127,6 +156,8 @@ def _import_preview(handler, service):
 
 def _handle(handler, method: str, identifier: str | None, query: dict):
     service = handler.server.candidate_service
+    remote = getattr(handler.server, "remote_services", None)
+    links = remote.resume_candidates if remote is not None else None
     if identifier and identifier.startswith("attachment:"):
         if method != "GET" or not identifier.removeprefix("attachment:").isdigit():
             return handler.send(405, {"error": "不支持此操作"})
@@ -154,15 +185,22 @@ def _handle(handler, method: str, identifier: str | None, query: dict):
         service.update(int(identifier), handler.body())
         return handler.send(200, {"ok": True})
     if method == "DELETE" and identifier and identifier.isdigit():
-        preview = service.delete_preview([int(identifier)])["details"]
-        service.delete([int(identifier)], preview)
+        if links:
+            links.delete_candidates([int(identifier)])
+        else:
+            preview = service.delete_preview([int(identifier)])["details"]
+            service.delete([int(identifier)], preview)
         return handler.send(200, {"ok": True})
     if method == "POST" and identifier == "delete-preview":
-        details = service.delete_preview(handler.body().get("ids"))["details"]
+        ids = handler.body().get("ids")
+        details = links.candidate_delete_preview(ids) if links else service.delete_preview(ids)["details"]
         return handler.send(200, {"items": details, "count": len(details)})
     if method == "POST" and identifier == "batch-delete":
         payload = handler.body()
-        count = service.delete(payload.get("ids"), payload.get("expected") or service.delete_preview(payload.get("ids"))["details"])
+        if links:
+            count = links.delete_candidates(payload.get("ids"), payload.get("expected"))
+        else:
+            count = service.delete(payload.get("ids"), payload.get("expected") or service.delete_preview(payload.get("ids"))["details"])
         return handler.send(200, {"count": count})
     if method == "POST" and identifier == "import-preview":
         return _import_preview(handler, service)

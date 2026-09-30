@@ -26,8 +26,12 @@ from features.resume_documents import dify_mapping
 from features.resume_documents import file_types as resume_file_types
 from features.resume_documents.filename_position import infer_position
 from features.nocobase_sync.http_adapter import (
-    build_candidate_service,
+    build_remote_services,
     handle_remote_candidate_request,
+)
+from features.nocobase_sync.resume_http_adapter import (
+    handle_public_remote_resume_request,
+    handle_remote_resume_request,
 )
 from datetime import datetime
 from contextlib import contextmanager
@@ -1101,6 +1105,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/public/resume-schema' and method == 'GET':
             return self.send(200, {'fields': [field for field in SCHEMAS['resume_documents']['fields'] if field['key'] in ('position', 'position_detail', 'resume', 'channel', 'channel_detail')]})
         if path in ('/api/public/resumes/campus', '/api/public/resumes/social') and method == 'POST':
+            remote_services = getattr(self.server, 'remote_services', None)
+            if remote_services is not None and handle_public_remote_resume_request(
+                    self, method, path.rsplit('/', 1)[-1]):
+                return
             submitted = self.body()
             if not isinstance(submitted, dict):
                 raise ValueError('提交内容必须为对象')
@@ -1214,6 +1222,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(401, {'error': '账号已注销，请重新登录'})
                 user = {**user, 'role': 'manager' if member['is_admin'] else 'member'}
             candidate_service = getattr(self.server, 'candidate_service', None)
+            remote_services = getattr(self.server, 'remote_services', None)
+            if remote_services is not None:
+                resume_parts = path.strip('/').split('/')
+                if len(resume_parts) >= 2 and resume_parts[:2] == ['api', 'resume_documents']:
+                    identifier = '/'.join(resume_parts[2:]) or None
+                    if handle_remote_resume_request(
+                            self, method, identifier, parse_qs(url.query)):
+                        return
             if candidate_service is not None:
                 if path.startswith('/api/attachments/'):
                     attachment_id = path.rsplit('/', 1)[-1]
@@ -1754,9 +1770,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     initialize()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    server.candidate_service = build_candidate_service(DATA)
+    server.remote_services = build_remote_services(DATA)
+    server.candidate_service = server.remote_services.candidates if server.remote_services else None
     server.candidate_imports = IMPORTS
     server.candidate_schema = SCHEMAS['candidates']
+    server.resume_schema = SCHEMAS['resume_documents']
 
     def prepare_candidate_import(payload):
         with db() as conn:

@@ -119,6 +119,9 @@ class ResumeCandidateService:
                                         "name": row.get("name") or str(row["id"])})
         return details
 
+    def resume_delete_preview(self, ids: list[int]) -> list[dict]:
+        return self._resume_delete_preview(self._ids(ids))
+
     def delete_resumes(self, ids: list[int], expected: list[dict] | None = None) -> int:
         identifiers = self._ids(ids)
         details = self._resume_delete_preview(identifiers)
@@ -145,6 +148,9 @@ class ResumeCandidateService:
                 details.append({"entity": "resume_documents", "id": source["id"],
                                 "name": source.get("name") or str(source["id"])})
         return details
+
+    def candidate_delete_preview(self, ids: list[int]) -> list[dict]:
+        return self._candidate_delete_preview(self._ids(ids))
 
     def delete_candidates(self, ids: list[int], expected: list[dict] | None = None) -> int:
         identifiers = self._ids(ids)
