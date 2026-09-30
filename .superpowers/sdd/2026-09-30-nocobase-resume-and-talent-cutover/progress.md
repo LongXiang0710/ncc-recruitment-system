@@ -8,3 +8,4 @@ Pre-flight: Task 6 RemoteCandidateService.find_by_phone -> Task 8 RemoteCandidat
 Pre-flight: Task 7 RemoteServices -> Tasks 9-11: consistent; runtime and migration receive the same repositories/services without SQLite fallback.
 Pre-flight: Task 10 MigrationReport/digests -> Task 11 apply: consistent; apply revalidates both digests before any mutation.
 Task 1: complete (commits c71a7af..97b40ec, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 239 tests, OK)
+Task 2: complete (commits 97b40ec..9554273, tests: python -m unittest discover -s tests -p 'test_*.py' → Ran 244 tests, OK)

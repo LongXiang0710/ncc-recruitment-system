@@ -160,6 +160,18 @@ class NocoBaseClientTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client.download("https://example.test:not-a-port/file.pdf")
 
+    def test_download_enforces_maximum_bytes_while_reading(self):
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda _request, _timeout: Response(b"12345"),
+        )
+        with self.assertRaisesRegex(ValueError, "大小"):
+            client.download("https://example.test/file.pdf", maximum_bytes=4)
+        self.assertEqual(
+            client.download("https://example.test/file.pdf", maximum_bytes=5),
+            (b"12345", "application/octet-stream"),
+        )
+
     def test_upload_sanitizes_multipart_header_characters_in_filename(self):
         requests = []
         client = NocoBaseClient(

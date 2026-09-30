@@ -148,7 +148,7 @@ class NocoBaseClient:
             raise NocoBaseError("protocol", None, endpoint)
         return data
 
-    def download(self, url: str) -> tuple[bytes, str]:
+    def download(self, url: str, *, maximum_bytes: int | None = None) -> tuple[bytes, str]:
         if not self.config.enabled:
             raise NocoBaseError("disabled", None, "attachment:download")
         try:
@@ -166,6 +166,13 @@ class NocoBaseClient:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         request = Request(url, method="GET", headers=headers)
         with self._open(request, "attachment:download") as response:
-            content = response.read()
+            if maximum_bytes is not None:
+                if type(maximum_bytes) is not int or maximum_bytes <= 0:
+                    raise ValueError("附件大小限制无效。")
+                content = response.read(maximum_bytes + 1)
+                if len(content) > maximum_bytes:
+                    raise ValueError("附件大小超过允许范围。")
+            else:
+                content = response.read()
             content_type = response.headers.get("Content-Type", "application/octet-stream").split(";", 1)[0].strip()
         return content, content_type or "application/octet-stream"
