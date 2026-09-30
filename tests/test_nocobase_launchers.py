@@ -14,6 +14,7 @@ class NocoBaseLauncherTests(unittest.TestCase):
             "检查NocoBase连接.bat": "check",
             "启用NocoBase人才库.bat": "enable",
             "停用NocoBase人才库.bat": "disable",
+            "启用NocoBase简历与人才库.bat": "enable",
         }
         for filename, command in expected.items():
             with self.subTest(filename=filename):
@@ -22,6 +23,16 @@ class NocoBaseLauncherTests(unittest.TestCase):
                 self.assertIn(f"python -m features.nocobase_sync.configure {command}", text)
                 self.assertNotIn("cloud.njncc.com", text)
                 self.assertNotIn("bearer ", text)
+
+        migration = {
+            "检查NocoBase迁移.bat": "check",
+            "执行NocoBase迁移.bat": "apply",
+        }
+        for filename, command in migration.items():
+            text = (ROOT / filename).read_text(encoding="utf-8-sig").lower()
+            self.assertIn('%~dp0', text)
+            self.assertIn(f"features.nocobase_sync.migration_cli {command}", text)
+            self.assertNotIn("cloud.njncc.com", text)
 
     def test_readme_documents_guarded_fixed_ip_cutover(self):
         text = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -35,6 +46,9 @@ class NocoBaseLauncherTests(unittest.TestCase):
             "检查NocoBase连接.bat",
             "启用NocoBase人才库.bat",
             "停用NocoBase人才库.bat",
+            "检查NocoBase迁移.bat",
+            "执行NocoBase迁移.bat",
+            "启用NocoBase简历与人才库.bat",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
