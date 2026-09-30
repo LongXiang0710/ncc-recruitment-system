@@ -21,6 +21,10 @@ class RemoteResumeConsistencyError(RuntimeError):
 
 
 class RemoteResumeService:
+    SNAPSHOT_FIELDS = (
+        "updated_at", "status", "resume", "source_id", "file_hash",
+        "recruitment_type", "channel", "channel_detail", "position", "position_detail",
+    )
     SYSTEM_FIELDS = {
         "id", "archive_no", "source_id", "file_hash", "status", "recognition_result",
         "linked_candidate", "created_at", "updated_at", "created_by", "resume",
@@ -67,7 +71,25 @@ class RemoteResumeService:
         return [row for row in self.list_all() if row.get("status") == "待识别"]
 
     def read_attachment(self, identifier: int) -> tuple[bytes, str, str]:
-        return self.attachments.read(identifier)
+        attachments = self.attachments.list(identifier)
+        if len(attachments) != 1:
+            raise ValueError("简历附件不存在或数量异常")
+        return self.attachments.read(attachments[0]["id"])
+
+    @classmethod
+    def recognition_snapshot(cls, row: dict) -> dict:
+        return {key: row.get(key) for key in cls.SNAPSHOT_FIELDS}
+
+    def update_recognition(self, identifier: int, snapshot: dict, *, status: str,
+                           result: str | None = None) -> bool:
+        current = self.get(identifier)
+        if current is None or self.recognition_snapshot(current) != snapshot:
+            return False
+        values = {"status": status}
+        if result is not None:
+            values["recognition_result"] = result
+        self.resumes.update(identifier, values)
+        return True
 
     def _fields(self) -> dict[str, dict]:
         return {field["key"]: field for field in self.schema.get("fields", [])}

@@ -163,6 +163,21 @@ class RemoteResumeServiceTests(unittest.TestCase):
         self.assertEqual(resumes.rows[1]["name"], "旧.pdf")
         self.assertIn(("restore", 1, [{"id": 8, "filename": "旧.pdf"}]), attachments.calls)
 
+    def test_read_attachment_resolves_the_resume_relation_before_download(self):
+        resumes, attachments = FakeResumes(), FakeAttachments()
+        resumes.rows[7] = {"id": 7, "status": "待识别"}
+        attachments.by_resume[7] = [{"id": 81, "filename": "候选人.pdf"}]
+        reads = []
+
+        def read_attachment(identifier):
+            reads.append(identifier)
+            return b"%PDF", "application/pdf", "候选人.pdf"
+
+        attachments.read = read_attachment
+        result = self.service(resumes, attachments).read_attachment(7)
+        self.assertEqual(result[2], "候选人.pdf")
+        self.assertEqual(reads, [81])
+
 
 if __name__ == "__main__":
     unittest.main()
