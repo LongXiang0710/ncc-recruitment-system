@@ -15,26 +15,34 @@ def language_summary(application):
 
 
 def prefill(candidate, conn, education_rows):
-    values = {key: candidate[key] or '' for key in APPLICATION_COPY_FIELDS}
-    values['education_experiences'] = education_rows(conn, 'candidates', candidate['id'])
-    values['archive_no'] = candidate['archive_no'] or ''
-    if candidate['school_id']:
-        school = conn.execute('SELECT * FROM schools WHERE id=?', (candidate['school_id'],)).fetchone()
+    values = {key: (candidate.get(key) if isinstance(candidate, dict) else candidate[key]) or ''
+              for key in APPLICATION_COPY_FIELDS}
+    values['education_experiences'] = candidate.get('education_experiences') if isinstance(candidate, dict) else None
+    if values['education_experiences'] is None:
+        values['education_experiences'] = education_rows(conn, 'candidates', candidate['id'])
+    archive_no = candidate.get('archive_no') if isinstance(candidate, dict) else candidate['archive_no']
+    school_id = candidate.get('school_id') if isinstance(candidate, dict) else candidate['school_id']
+    school_name = candidate.get('school_name') if isinstance(candidate, dict) else candidate['school_name']
+    values['archive_no'] = archive_no or ''
+    if school_id:
+        school = conn.execute('SELECT * FROM schools WHERE id=?', (school_id,)).fetchone()
     else:
-        matches = conn.execute('SELECT * FROM schools WHERE name=?', (candidate['school_name'],)).fetchall()
+        matches = conn.execute('SELECT * FROM schools WHERE name=?', (school_name,)).fetchall()
         school = matches[0] if len(matches) == 1 else None
     if school:
         values.update({key: school[key] or '' for key in ('is_985', 'is_211', 'is_double_first')})
     return values
 
 
-def prepare_validation(payload, conn, application_prefill):
+def prepare_validation(payload, conn, application_prefill, candidate_reference=None):
     result = dict(payload)
     if 'phone' in result:
-        match = conn.execute('SELECT id FROM candidates WHERE phone=?', (str(result.get('phone') or '').strip(),)).fetchone()
+        match = (candidate_reference.find_by_phone(result.get('phone')) if candidate_reference else
+                 conn.execute('SELECT id FROM candidates WHERE phone=?', (str(result.get('phone') or '').strip(),)).fetchone())
         result['candidate_id'] = match['id'] if match else None
     if result.get('candidate_id'):
-        candidate = conn.execute('SELECT * FROM candidates WHERE id=?', (result['candidate_id'],)).fetchone()
+        candidate = (candidate_reference.profile(result['candidate_id']) if candidate_reference else
+                     conn.execute('SELECT * FROM candidates WHERE id=?', (result['candidate_id'],)).fetchone())
         if candidate:
             for key, value in application_prefill(candidate, conn).items():
                 if key not in result or key in ('name', 'school_name') and not result[key]:

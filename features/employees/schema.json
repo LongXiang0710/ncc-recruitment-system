@@ -148,7 +148,7 @@
     {
       "key": "candidate_id",
       "label": "原入职人员",
-      "ref": "candidates",
+      "remoteRef": "candidates",
       "hidden": true
     },
     {

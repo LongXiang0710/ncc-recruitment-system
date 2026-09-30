@@ -230,7 +230,7 @@
     {
       "key": "candidate_id",
       "label": "关联人才档案",
-      "ref": "candidates",
+      "remoteRef": "candidates",
       "hidden": true
     },
     {

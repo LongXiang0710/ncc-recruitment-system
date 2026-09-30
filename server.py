@@ -33,6 +33,12 @@ from features.nocobase_sync.resume_http_adapter import (
     handle_public_remote_resume_request,
     handle_remote_resume_request,
 )
+from features.nocobase_sync.backend import read_backend
+from features.nocobase_sync.candidate_reference import (
+    RemoteCandidateReference,
+    upgrade_remote_candidate_foreign_keys,
+)
+from features.nocobase_sync.remote_candidate_service import RemoteCandidateConsistencyError
 from datetime import datetime
 from contextlib import contextmanager
 from http.cookies import SimpleCookie
@@ -47,6 +53,7 @@ import qrcode.image.svg
 DATA = Path(os.environ.get('RECRUIT_DATA_DIR', ROOT / 'data'))
 FEATURES = load_features(ROOT / 'features')
 SCHEMAS = {name: feature.schema for name, feature in FEATURES.items()}
+REMOTE_CANDIDATES = None
 ENABLED_SCHEMAS = {name: feature.schema for name, feature in FEATURES.items() if feature.enabled}
 LOCATIONS = json.loads((ROOT / 'web' / 'china-locations.json').read_text(encoding='utf-8'))
 SESSIONS = {}
@@ -124,8 +131,13 @@ def export_rows(conn, entity, ids=None, query=''):
     if entity in ('candidates', 'applications', 'interviews', 'employees', 'resume_documents'):
         rows = [candidate_display(row, conn, entity) for row in rows]
     for field in SCHEMAS[entity]['fields']:
-        if field.get('ref'):
-            names = {row['id']: row['name'] for row in conn.execute(f"SELECT id,name FROM {field['ref']}")}
+        reference = field.get('ref') or field.get('remoteRef')
+        if reference:
+            if field.get('remoteRef') and REMOTE_CANDIDATES:
+                names = {identifier: REMOTE_CANDIDATES.label(identifier)
+                         for identifier in {row.get(field['key']) for row in rows if row.get(field['key'])}}
+            else:
+                names = {row['id']: row['name'] for row in conn.execute(f"SELECT id,name FROM {reference}")}
             for row in rows:
                 row[field['key'] + '_label'] = names.get(row[field['key']], '')
     if query:
@@ -275,13 +287,15 @@ def initialize():
             if 'phone' not in {row['name'] for row in conn.execute(f'PRAGMA table_info({account_table})')}:
                 conn.execute(f"ALTER TABLE {account_table} ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
         conn.execute('CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, name TEXT NOT NULL, content BLOB NOT NULL)')
+        remote_backend_selected = read_backend(DATA) == 'nocobase'
         for entity, spec in SCHEMAS.items():
             columns = []
             stored_fields = [field for field in spec['fields'] if not field.get('virtual')]
             for field in stored_fields:
-                column = field['key'] + (' INTEGER' if field.get('ref') else ' TEXT')
-                if field.get('ref'):
-                    column += ' REFERENCES ' + field['ref'] + '(id) ON DELETE RESTRICT'
+                column = field['key'] + (' INTEGER' if field.get('ref') or field.get('remoteRef') else ' TEXT')
+                reference = field.get('ref') or (field.get('remoteRef') if not remote_backend_selected else None)
+                if reference:
+                    column += ' REFERENCES ' + reference + '(id) ON DELETE RESTRICT'
                 columns.append(column)
             conn.execute(f"CREATE TABLE IF NOT EXISTS {entity} (id INTEGER PRIMARY KEY AUTOINCREMENT, {', '.join(columns)}, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
             existing = {row['name'] for row in conn.execute(f'PRAGMA table_info({entity})')}
@@ -289,8 +303,10 @@ def initialize():
                 if field['key'] not in existing:
                     conn.execute(f'ALTER TABLE {entity} ADD COLUMN {column}')
             for field in spec['fields']:
-                if field.get('ref'):
+                if field.get('ref') or field.get('remoteRef'):
                     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{entity}_{field['key']} ON {entity}({field['key']})")
+        if remote_backend_selected:
+            upgrade_remote_candidate_foreign_keys(conn)
         for entity in ('candidates', 'applications', 'interviews', 'employees'):
             conn.execute(
                 f"UPDATE {entity} SET birthdate=substr(birthdate,1,7) "
@@ -466,7 +482,9 @@ def validate(entity, payload, conn):
         if payload.get('education') == '大专':
             payload['education'] = '专科'
     if entity == 'applications':
-        payload = FEATURES['applications'].service.prepare_validation(payload, conn, application_prefill)
+        payload = FEATURES['applications'].service.prepare_validation(
+            payload, conn, application_prefill, REMOTE_CANDIDATES,
+        )
     if entity == 'interviews':
         payload = FEATURES['interviews'].service.prepare_validation(payload, conn, identity_details, interview_source_values)
     if entity == 'employees':
@@ -534,8 +552,13 @@ def validate(entity, payload, conn):
                 raise ValueError(field['label'] + f"应在{field.get('min', 0)}至{field.get('max', 100)}之间")
             if field.get('step') == 1:
                 value = str(int(number))
-        if field.get('ref'):
-            if value and (not value.isdigit() or not conn.execute(f"SELECT id FROM {field['ref']} WHERE id=?", (value,)).fetchone()):
+        reference = field.get('ref') or field.get('remoteRef')
+        if reference:
+            if field.get('remoteRef') and REMOTE_CANDIDATES:
+                exists = value.isdigit() and REMOTE_CANDIDATES.exists(int(value))
+            else:
+                exists = value.isdigit() and bool(conn.execute(f"SELECT id FROM {reference} WHERE id=?", (value,)).fetchone())
+            if value and not exists:
                 raise ValueError(field['label'] + '不存在，请重新选择')
             value = int(value) if value else None
         result[key] = value
@@ -682,6 +705,8 @@ def save_candidate_educations(conn, candidate_id, rows, fallback=None):
     save_education_experiences(conn, 'candidates', candidate_id, rows, fallback)
 
 def sync_application_educations_to_candidate(conn, application_id):
+    if REMOTE_CANDIDATES:
+        return
     application = conn.execute('SELECT candidate_id FROM applications WHERE id=?', (application_id,)).fetchone()
     if application and application['candidate_id']:
         rows = education_rows(conn, 'applications', application_id)
@@ -704,14 +729,16 @@ def attachment_values(entity, payload, conn, existing=None):
         else:
             values['name'] = '待上传简历'
     if entity == 'applications' and 'phone' in values:
-        match = conn.execute('SELECT id FROM candidates WHERE phone=?', (str(values.get('phone') or '').strip(),)).fetchone()
+        match = (REMOTE_CANDIDATES.find_by_phone(values.get('phone')) if REMOTE_CANDIDATES else
+                 conn.execute('SELECT id FROM candidates WHERE phone=?', (str(values.get('phone') or '').strip(),)).fetchone())
         values['candidate_id'] = match['id'] if match else None
     attachment_fields = [field for field in SCHEMAS[entity]['fields'] if field.get('type') == 'attachment']
     for field in attachment_fields:
         values[field['key']] = (existing or {}).get(field['key']) or ''
     if entity == 'applications' and (payload.get('_sync_attachments') is True or not existing or str(values.get('phone') or '').strip() != str(existing.get('phone') or '').strip()):
         values['resume'] = ''
-        candidate = conn.execute('SELECT resume FROM candidates WHERE id=?', (values.get('candidate_id'),)).fetchone()
+        candidate = (REMOTE_CANDIDATES.profile(values.get('candidate_id')) if REMOTE_CANDIDATES and values.get('candidate_id') else
+                     conn.execute('SELECT resume FROM candidates WHERE id=?', (values.get('candidate_id'),)).fetchone())
         if candidate:
             values['resume'] = candidate['resume'] or ''
     if entity == 'interviews' and (payload.get('_sync_attachments') is True or not existing or str(values.get('identity_card') or '').strip().upper() != str(existing.get('identity_card') or '').strip().upper()):
@@ -801,7 +828,8 @@ def deletion_plan(conn, entity, ids):
         visited.add(key)
         for child, spec in SCHEMAS.items():
             for field in spec['fields']:
-                if field.get('ref') == table:
+                reference = field.get('ref') or (field.get('remoteRef') if not REMOTE_CANDIDATES else None)
+                if reference == table:
                     for related in conn.execute(f"SELECT * FROM {child} WHERE {field['key']}=?", (row['id'],)).fetchall():
                         visit(child, related)
         if table == 'candidates' and row['phone']:
@@ -824,7 +852,8 @@ def execute_deletion(conn, plan):
     for table, row in plan:
         for child, spec in SCHEMAS.items():
             for field in spec['fields']:
-                if field.get('ref') == table:
+                reference = field.get('ref') or (field.get('remoteRef') if not REMOTE_CANDIDATES else None)
+                if reference == table:
                     for related in conn.execute(f"SELECT id FROM {child} WHERE {field['key']}=?", (row['id'],)).fetchall():
                         if (child, related['id']) not in deleting:
                             conn.execute(f"UPDATE {child} SET {field['key']}=NULL WHERE id=?", (related['id'],))
@@ -860,8 +889,47 @@ def account_display_name(user, conn):
 def dify_embed_url():
     return FEATURES['resume_documents'].service.dify_embed_url()
 
-def sync_application_talent(conn, values, application_id=None):
+@contextmanager
+def remote_candidate_compensation():
+    """Remove candidates created remotely when the surrounding local write fails."""
+    created = []
+    try:
+        yield created
+    except Exception as original_error:
+        compensation_failed = False
+        if REMOTE_CANDIDATES:
+            for identifier in reversed(created):
+                try:
+                    REMOTE_CANDIDATES.candidates.rollback_created(identifier)
+                except Exception:
+                    compensation_failed = True
+        if compensation_failed:
+            raise RemoteCandidateConsistencyError() from original_error
+        raise
+
+
+def sync_application_talent(conn, values, application_id=None, remote_created=None):
     phone = str(values.get('phone') or '').strip()
+    if REMOTE_CANDIDATES:
+        candidate = REMOTE_CANDIDATES.find_by_phone(phone) if phone else None
+        if not candidate:
+            if not phone or any(not values.get(key) for key in ('name', 'school_name', 'major', 'education')):
+                return None
+            payload = {key: values.get(key, '') for key in APPLICATION_COPY_FIELDS}
+            payload.update(recruitment_type='校园招聘', status='待筛选',
+                           education_experiences=[{
+                               key: values.get(key, '') for key in
+                               ('education', 'school_name', 'major', 'enrollment', 'graduation')
+            }])
+            candidate_id = REMOTE_CANDIDATES.candidates.create(payload)
+            if remote_created is not None:
+                remote_created.append(candidate_id)
+        else:
+            candidate_id = candidate['id']
+        if application_id:
+            conn.execute('UPDATE applications SET candidate_id=? WHERE id=?',
+                         (candidate_id, application_id))
+        return candidate_id
     candidate = conn.execute('SELECT * FROM candidates WHERE phone=?', (phone,)).fetchone() if phone else None
     if not candidate:
         if not phone or any(not values.get(key) for key in ('name', 'school_name', 'major', 'education')):
@@ -890,7 +958,7 @@ def sync_application_talent(conn, values, application_id=None):
         conn.execute('UPDATE applications SET candidate_id=? WHERE id=?', (candidate['id'], application_id))
     return candidate['id']
 
-def insert(conn, entity, values):
+def insert(conn, entity, values, remote_created=None):
     now = datetime.now().isoformat(timespec='seconds')
     values = dict(values, created_at=now, updated_at=now)
     keys = ','.join(values)
@@ -899,7 +967,7 @@ def insert(conn, entity, values):
     if entity in EDUCATION_TABLES:
         save_education_experiences(conn, entity, identifier, None, values)
     if entity == 'applications':
-        sync_application_talent(conn, values, identifier)
+        sync_application_talent(conn, values, identifier, remote_created=remote_created)
     if entity in ARCHIVE_ENTITIES:
         synchronize_archives(conn)
     return identifier
@@ -1153,12 +1221,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/public/application-prefill' and method == 'GET':
             phone = account_phone(parse_qs(url.query).get('phone', [''])[0])
             with db() as conn:
-                candidate = conn.execute('SELECT * FROM candidates WHERE phone=?', (phone,)).fetchone() if phone else None
+                candidate = (REMOTE_CANDIDATES.find_by_phone(phone) if REMOTE_CANDIDATES and phone else
+                             conn.execute('SELECT * FROM candidates WHERE phone=?', (phone,)).fetchone() if phone else None)
                 if not candidate:
                     return self.send(200, {'matched': False, 'values': {}})
                 allowed = {field['key'] for field in public_application_fields() if field.get('type') != 'attachment' and not field.get('readonly')}
                 values = {key: value for key, value in application_prefill(candidate, conn).items() if key in allowed}
-                values['education_experiences'] = education_rows(conn, 'candidates', candidate['id'])
+                values['education_experiences'] = (candidate.get('education_experiences', []) if REMOTE_CANDIDATES else
+                                                   education_rows(conn, 'candidates', candidate['id']))
             return self.send(200, {'matched': True, 'values': values})
         if path == '/api/public/apply' and method == 'POST':
             submitted = self.body()
@@ -1172,7 +1242,7 @@ class Handler(BaseHTTPRequestHandler):
                 values.update(education_experiences[0])
             values.update(screening='', needs_first_interview='', status='已生效', is_elite='', notes='', batch='', candidate_id=None)
             values.setdefault('date', datetime.now().date().isoformat())
-            with db() as conn:
+            with remote_candidate_compensation() as remote_created, db() as conn:
                 conn.execute('BEGIN IMMEDIATE')
                 existing = conn.execute('SELECT * FROM applications WHERE phone=? ORDER BY id DESC LIMIT 1', (str(values.get('phone') or '').strip(),)).fetchone()
                 if existing:
@@ -1185,12 +1255,12 @@ class Handler(BaseHTTPRequestHandler):
                     application['updated_at'] = datetime.now().isoformat(timespec='seconds')
                     conn.execute(f"UPDATE applications SET {','.join(key+'=?' for key in application)} WHERE id=?", [*application.values(), application_id])
                     save_education_experiences(conn, 'applications', application_id, education_experiences, application)
-                    sync_application_talent(conn, application, application_id)
+                    sync_application_talent(conn, application, application_id, remote_created=remote_created)
                     sync_application_educations_to_candidate(conn, application_id)
                     synchronize_archives(conn)
                     cleanup_record_attachments(conn, 'applications', existing)
                 else:
-                    application_id = insert(conn, 'applications', application)
+                    application_id = insert(conn, 'applications', application, remote_created=remote_created)
                     save_education_experiences(conn, 'applications', application_id, education_experiences, application)
                     sync_application_educations_to_candidate(conn, application_id)
                 candidate_id = conn.execute('SELECT candidate_id FROM applications WHERE id=?', (application_id,)).fetchone()['candidate_id']
@@ -1479,14 +1549,21 @@ class Handler(BaseHTTPRequestHandler):
                 params = parse_qs(url.query)
                 with db() as conn:
                     if 'phone' in params:
-                        candidate = conn.execute('SELECT * FROM candidates WHERE phone=?', (params['phone'][0].strip(),)).fetchone()
+                        candidate = (REMOTE_CANDIDATES.find_by_phone(params['phone'][0]) if REMOTE_CANDIDATES else
+                                     conn.execute('SELECT * FROM candidates WHERE phone=?', (params['phone'][0].strip(),)).fetchone())
                         if not candidate:
                             return self.send(200, {'matched': False, 'values': {}})
                         values = application_prefill(candidate, conn) if path == '/api/application-prefill' else interview_prefill(candidate, conn)
                         values = {key: value for key, value in values.items() if key not in ('resume', 'transcript', 'certificates')}
+                        if REMOTE_CANDIDATES:
+                            return self.send(200, {'matched': True, 'values': values,
+                                                   'resume': candidate.get('resume') or '',
+                                                   'resume_name': candidate.get('resume_name') or ''})
                         attachment = conn.execute('SELECT name FROM attachments WHERE id=?', (candidate['resume'] or '',)).fetchone()
                         return self.send(200, {'matched': True, 'values': values, 'resume': candidate['resume'] or '', 'resume_name': attachment['name'] if attachment else ''})
-                    candidate = conn.execute('SELECT * FROM candidates WHERE id=?', (params.get('id', [''])[0],)).fetchone()
+                    requested_id = params.get('id', [''])[0]
+                    candidate = (REMOTE_CANDIDATES.profile(int(requested_id)) if REMOTE_CANDIDATES and str(requested_id).isdigit() else
+                                 conn.execute('SELECT * FROM candidates WHERE id=?', (requested_id,)).fetchone())
                     if not candidate:
                         raise ValueError('关联人才不存在，请重新选择')
                     return self.send(200, application_prefill(candidate, conn))
@@ -1673,7 +1750,7 @@ class Handler(BaseHTTPRequestHandler):
                         fields = [f for f in SCHEMAS[entity]['fields'] if f.get('export', True) and not f.get('hidden')]
                         writer.writerow(['编号'] + [f['label'] for f in fields] + ['创建时间'])
                         for row in rows:
-                            values = [row['id']] + [row.get(f['key'] + '_label' if f.get('ref') else f['key'], '') for f in fields] + [row['created_at']]
+                            values = [row['id']] + [row.get(f['key'] + '_label' if f.get('ref') or f.get('remoteRef') else f['key'], '') for f in fields] + [row['created_at']]
                             writer.writerow(["'" + v if isinstance(v, str) and v.lstrip().startswith(('=', '+', '-', '@')) else v for v in values])
                         return self.send(200, ('\ufeff' + output.getvalue()).encode('utf-8'), 'text/csv; charset=utf-8', {'Content-Disposition': f"attachment; filename*=UTF-8''{quote(SCHEMAS[entity]['title'])}.csv"})
                     if identifier == 'export.xlsx':
@@ -1694,7 +1771,11 @@ class Handler(BaseHTTPRequestHandler):
                     record_id = insert(conn, entity, values)
                     if entity in EDUCATION_TABLES:
                         if entity == 'applications' and education_history is None and values.get('candidate_id'):
-                            education_history = education_rows(conn, 'candidates', values['candidate_id'])
+                            if REMOTE_CANDIDATES:
+                                candidate = REMOTE_CANDIDATES.profile(values['candidate_id'])
+                                education_history = candidate.get('education_experiences', []) if candidate else []
+                            else:
+                                education_history = education_rows(conn, 'candidates', values['candidate_id'])
                         save_education_experiences(conn, entity, record_id, education_history, values)
                     if entity == 'candidates':
                         candidate_experiences.save(conn, record_id, experience_history)
@@ -1771,6 +1852,7 @@ if __name__ == '__main__':
     initialize()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     server.remote_services = build_remote_services(DATA)
+    REMOTE_CANDIDATES = RemoteCandidateReference(server.remote_services.candidates) if server.remote_services else None
     server.candidate_service = server.remote_services.candidates if server.remote_services else None
     server.candidate_imports = IMPORTS
     server.candidate_schema = SCHEMAS['candidates']

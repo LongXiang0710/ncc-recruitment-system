@@ -178,7 +178,7 @@ function renderTable() {
   const paging = paginationTools.paginate(filtered,page,pageSize); page=paging.page; pageSize=paging.pageSize;
   const pages = paging.pages, shown = paging.rows.map(item=>item.value);
   const hasListFilter=!!search || !!featureUI.hasActiveFilters?.();
-  const tableContent = shown.length ? `<div class="table-wrap"><table><thead><tr><th class="id-col">编号</th>${visibleFields.map(field=>`<th>${field.label}</th>`).join('')}<th class="action-column">操作</th></tr></thead><tbody>${shown.map(row=>`<tr><td class="muted">${String(row.id).padStart(4,'0')}</td>${visibleFields.map(field=>`<td>${['status','cooperation'].includes(field.key)?badge(row[field.key]):escapeHTML(row[field.ref?field.key+'_label':field.key] || '—')}</td>`).join('')}<td class="row-actions"><button data-edit="${row.id}">查看 / 编辑</button><button data-delete="${row.id}" class="danger">删除</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty"><div>${icons[entity]}</div><h3>${hasListFilter?'没有匹配的记录':'还没有'+spec.short+'记录'}</h3><p>${hasListFilter?'请调整搜索或筛选条件。':'点击右上角新增，开始建立招聘档案。'}</p></div>`;
+      const tableContent = shown.length ? `<div class="table-wrap"><table><thead><tr><th class="id-col">编号</th>${visibleFields.map(field=>`<th>${field.label}</th>`).join('')}<th class="action-column">操作</th></tr></thead><tbody>${shown.map(row=>`<tr><td class="muted">${String(row.id).padStart(4,'0')}</td>${visibleFields.map(field=>`<td>${['status','cooperation'].includes(field.key)?badge(row[field.key]):escapeHTML(row[(field.ref||field.remoteRef)?field.key+'_label':field.key] || '—')}</td>`).join('')}<td class="row-actions"><button data-edit="${row.id}">查看 / 编辑</button><button data-delete="${row.id}" class="danger">删除</button></td></tr>`).join('')}</tbody></table></div>` : `<div class="empty"><div>${icons[entity]}</div><h3>${hasListFilter?'没有匹配的记录':'还没有'+spec.short+'记录'}</h3><p>${hasListFilter?'请调整搜索或筛选条件。':'点击右上角新增，开始建立招聘档案。'}</p></div>`;
   document.querySelector('#record-table').innerHTML = tableContent + paginationTools.paginationFooter(filtered.length,paging);
   document.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>edit(entity,records.find(row=>row.id===Number(button.dataset.edit))));
   document.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>remove(entity,Number(button.dataset.delete)));
@@ -229,13 +229,14 @@ function renderTable() {
 async function fieldsHTML(fields, row={}) {
   fields=fields.filter(field=>!field.hidden);
   const refs = {};
-  await Promise.all([...new Set(fields.filter(f=>f.ref).map(f=>f.ref))].map(async ref=>{refs[ref]=await api(ref);}));
+  await Promise.all([...new Set(fields.filter(f=>f.ref||f.remoteRef).map(f=>f.ref||f.remoteRef))].map(async ref=>{refs[ref]=await api(ref);}));
   return fields.map(field=>{
     const value = row[field.key] ?? '', required = field.required ? 'required' : '';
     const common = `name="${field.key}" id="f-${field.key}" ${required} ${field.type==='datetime-local'?`step="${field.precision==='minutes'?60:1}"`:''} ${field.readonly?'readonly aria-readonly="true"':''}`;
     let input;
-    if(field.options || field.ref) {
-      const choices = field.ref ? refs[field.ref].map(item=>[item.id,item.name+(item.phone?' · '+item.phone:'')]) : field.options.map(item=>[item,item]);
+    if(field.options || field.ref || field.remoteRef) {
+      const reference=field.ref||field.remoteRef;
+      const choices = reference ? refs[reference].map(item=>[item.id,item.name+(item.phone?' · '+item.phone:'')]) : field.options.map(item=>[item,item]);
       input = `<select ${common}><option value="">请选择${field.label}</option>${choices.map(([key,label])=>`<option value="${escapeHTML(key)}" ${String(key)===String(value)?'selected':''}>${escapeHTML(label)}</option>`).join('')}</select>`;
     } else if(field.type==='attachment') input = `<span class="attachment-upload"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M5 21v6h22v-6M16 21V6m-5 5 5-5 5 5"/></svg><input id="${field.key}-file" data-attachment="${field.key}" type="file" aria-label="上传${field.label}" title="选择${field.label}" accept="${field.accept || '.pdf,.doc,.docx'}"></span><span class="attachment-selection hint" role="status"></span><span class="hint attachment-help">支持 ${field.accept || '.pdf,.doc,.docx'}，每份最大50MB，保存时上传。</span>${value?`<div class="attachment-existing"><a href="/api/attachments/${encodeURIComponent(value)}">下载：${escapeHTML(row[field.key+'_name'] || '已有附件')}</a><label><input type="checkbox" name="_remove_${field.key}"> 移除已有附件</label></div>`:''}${field.signature?'<div class="signature-pad"><span class="hint">也可在下方手写签名，保存后生成PNG附件</span><canvas id="signature-canvas" width="800" height="240" aria-label="本人手写签名区域"></canvas><button type="button" class="secondary" id="clear-signature">清空手写签名</button></div>':''}`;
     else if(['date','month','datetime-local'].includes(field.type)) {
