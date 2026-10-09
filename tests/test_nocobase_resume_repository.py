@@ -61,7 +61,7 @@ class ResumeRepositoryTests(unittest.TestCase):
                         "linked_candidate": {"id": 33}}]
         self.assertEqual(repository.find_by_linked_candidate(33)[0]["id"], 5)
         self.assertEqual(client.calls[-1], ("Resume_Collection:list", {"params": {
-            "pageSize": 100, "filter": {"linked_candidate": {"id": {"$eq": 33}}},
+            "pageSize": 100, "filter": {"linked_candidate": {"id": 33}},
         }}))
 
         client.data = {"id": 8}

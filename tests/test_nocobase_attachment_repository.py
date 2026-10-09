@@ -84,16 +84,16 @@ class AttachmentRepositoryTests(unittest.TestCase):
         ))
         self.assertEqual(client.calls[2], (
             "request", "campus_talent_pool/2/biographical_notes:set",
-            {"method": "POST", "body": {"values": [9]}},
+            {"method": "POST", "params": {"filterByTks": [9]}},
         ))
         self.assertEqual(client.calls[3], (
             "request", "campus_talent_pool:list", {
-                "params": {"pageSize": 1, "filter": {"biographical_notes": {"id": {"$eq": 4}}}},
+                "params": {"pageSize": 1, "filter": {"biographical_notes": {"id": 4}}},
             },
         ))
         self.assertEqual(client.calls[4], (
             "request", "Resume_Collection:list", {
-                "params": {"pageSize": 1, "filter": {"Resume": {"id": {"$eq": 4}}}},
+                "params": {"pageSize": 1, "filter": {"Resume": {"id": 4}}},
             },
         ))
         self.assertEqual(client.calls[5], (
@@ -110,7 +110,7 @@ class AttachmentRepositoryTests(unittest.TestCase):
         self.assertEqual(self.repository(remove_client).replace(2, remove=True), [])
         self.assertEqual(remove_client.calls[1], (
             "request", "campus_talent_pool/2/biographical_notes:set",
-            {"method": "POST", "body": {"values": []}},
+            {"method": "POST", "params": {"filterByTks": []}},
         ))
         self.assertFalse(any(call[1] == "attachments:destroy" for call in remove_client.calls))
 
@@ -161,7 +161,7 @@ class AttachmentRepositoryTests(unittest.TestCase):
         self.repository(client).restore(3, [{"id": 8}, {"id": 9}])
         self.assertEqual(client.calls, [(
             "request", "campus_talent_pool/3/biographical_notes:set",
-            {"method": "POST", "body": {"values": [8, 9]}},
+            {"method": "POST", "params": {"filterByTks": [8, 9]}},
         )])
 
     def test_invalid_attachment_responses_are_protocol_errors(self):

@@ -40,9 +40,9 @@ class NocoBaseError(RuntimeError):
 
 
 class NocoBaseClient:
-    def __init__(self, config: NocoBaseConfig, *, opener=urlopen, timeout: int = 30):
+    def __init__(self, config: NocoBaseConfig, *, opener=None, timeout: int = 30):
         self.config = config
-        self.opener = opener
+        self.opener = opener or (lambda request, seconds: urlopen(request, timeout=seconds))
         self.timeout = timeout
 
     def _api_root(self) -> str:
@@ -97,6 +97,27 @@ class NocoBaseClient:
                 body: dict | None = None):
         return self.request_envelope(action, method=method, params=params, body=body).data
 
+    def request_document(self, action: str, *, params: dict | None = None) -> dict:
+        """Read endpoints such as Swagger that return a raw JSON document."""
+        endpoint, url = self._query_url(action, params)
+        if not self.config.enabled:
+            raise NocoBaseError("disabled", None, endpoint)
+        request = Request(url, method="GET", headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.config.api_key}",
+            "X-Locale": "zh-CN",
+        })
+        with self._open(request, endpoint) as response:
+            try:
+                payload = json.loads(response.read().decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise NocoBaseError("protocol", None, endpoint) from None
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            payload = payload["data"]
+        if not isinstance(payload, dict):
+            raise NocoBaseError("protocol", None, endpoint)
+        return payload
+
     def request_envelope(self, action: str, *, method: str = "GET", params: dict | None = None,
                          body: dict | None = None) -> NocoBaseResponse:
         endpoint, url = self._query_url(action, params)
@@ -119,6 +140,24 @@ class NocoBaseClient:
         if meta is not None and not isinstance(meta, dict):
             raise NocoBaseError("protocol", None, endpoint)
         return NocoBaseResponse(payload["data"], meta)
+
+    def request_void(self, action: str, *, method: str = "POST",
+                     params: dict | None = None, body: dict | None = None) -> None:
+        """Execute an action whose successful response body is intentionally irrelevant."""
+        endpoint, url = self._query_url(action, params)
+        if not self.config.enabled:
+            raise NocoBaseError("disabled", None, endpoint)
+        data = None if body is None else json.dumps(
+            body, ensure_ascii=False, separators=(",", ":"),
+        ).encode("utf-8")
+        request = Request(url, data=data, method=method.upper(), headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.config.api_key}",
+            "X-Locale": "zh-CN",
+        })
+        with self._open(request, endpoint) as response:
+            response.read()
 
     def upload(self, action: str, *, filename: str, mime_type: str, content: bytes,
                params: dict | None = None) -> dict:

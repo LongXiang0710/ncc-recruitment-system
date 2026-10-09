@@ -1,7 +1,7 @@
 const app = document.querySelector('#app');
 const dialog = document.querySelector('#editor');
 const icons = {overview:'◫',schools:'▥',candidates:'♙',applications:'▤',interviews:'◎',employees:'▣',questions:'?',resume_documents:'▧'};
-let schemas = {}, current = 'overview', records = [], search = '', page = 1, pageSize = paginationTools.loadPageSize(window.localStorage), requestVersion = 0;
+let schemas = {}, current = 'overview', records = [], search = '', page = 1, pageSize = paginationTools.loadPageSize(window.localStorage), requestVersion = 0, currentUser = null;
 let locations = {};
 let selectedIds = new Set();
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -82,7 +82,7 @@ function login() {
 }
 async function boot() {
   try { schemas = await api('schema'); } catch(error) { login(); return; }
-  const user=await api('me');
+  const user=await api('me');currentUser=user;
   app.innerHTML = `<div class="layout"><aside><a class="identity" href="/"><div class="logo">N</div><div>南化建<strong>招聘管理系统</strong></div></a><div class="nav-caption">招聘工作空间</div><nav><button data-nav="overview"><i>${icons.overview}</i>招聘总览</button>${Object.entries(schemas).sort(([a],[b])=>({resume_documents:0,candidates:1}[a]??2)-({resume_documents:0,candidates:1}[b]??2)).map(([key, spec]) => `<button data-nav="${key}"><i>${icons[key]}</i>${spec.title}</button>`).join('')}</nav><div class="aside-bottom"><span class="online-dot"></span>局域网协作<div class="hint">数据统一保存于服务端</div></div></aside><div class="workspace"><header><span>人才招聘 <span class="slash">/</span> 招聘管理</span><div class="header-actions"><button id="password" class="text-button">修改密码</button><button id="logout" class="avatar" title="退出登录" aria-label="退出登录">管</button></div></header><main id="content"></main><footer>南化建招聘管理系统 <span>让每一份人才档案有序可循</span></footer></div></div>`;
   document.querySelectorAll('[data-nav]').forEach(button => button.onclick = () => { current = button.dataset.nav; search = ''; page = 1; render(); });
   document.querySelector('#logout').onclick = () => accountMenu(user);
@@ -276,7 +276,7 @@ async function edit(entity, row, draft=null, resumeSource=null) {
     if(['candidates','applications','interviews','employees'].includes(entity)) {
       educationRows=formRow.education_experiences?.length?formRow.education_experiences:[{education:formRow.education || '',school_name:formRow.school_name || '',major:formRow.major || ''}];
     }
-    if(featureUI.prepareEditor) ({formFields,formRow}=await featureUI.prepareEditor({spec,formFields,formRow,row}));
+    if(featureUI.prepareEditor) ({formFields,formRow}=await featureUI.prepareEditor({spec,formFields,formRow,row,user:currentUser,resumeSource}));
     const educationRequired=new Set(formFields.filter(field=>field.required && ['education','school_name','major'].includes(field.key)).map(field=>field.key));
     if(educationRows)formFields=formFields.filter(field=>!['education','school_name','major'].includes(field.key));
     const fields=await fieldsHTML(formFields,formRow);

@@ -55,7 +55,7 @@ class ResumeAttachmentRepositoryTests(unittest.TestCase):
         ))
         self.assertEqual(client.calls[2], (
             "request", "Resume_Collection/2/Resume:set",
-            {"method": "POST", "body": {"values": [9]}},
+            {"method": "POST", "params": {"filterByTks": [9]}},
         ))
         self.assertEqual([call[1] for call in client.calls[3:]], [
             "Resume_Collection:list", "campus_talent_pool:list", "attachments:destroy",

@@ -4,7 +4,7 @@
   if (root) root.PositionFields = api;
 })(typeof window !== 'undefined' ? window : globalThis, function() {
   const options = [
-    '机械工程师', '电气工程师', '安全工程师', '土建工程师',
+    '机械工程师', '电气工程师', '材料工程师', '安全工程师', '土建工程师',
     '管道工程师', '设备工程师', '数据分析师', '软件工程师',
     '财务专员', '其它',
   ];

@@ -21,7 +21,7 @@ class ResumeMappingTests(unittest.TestCase):
             "Job_Type": "社会招聘", "Campus_recruitment_channels": "",
             "External_hiring_channels": "智联招聘", "Details": "自定义",
             "Job": "机械工程师", "Other_job_titles": "", "Creator": "管理员",
-            "time": "2026-09-30T08:00:00", "source_id": "SRC-1", "file_hash": "abc",
+            "source_id": "SRC-1", "file_hash": "abc",
             "recognition_result": "{}", "linked_candidate": 9,
         })
         self.assertNotIn("status", result)

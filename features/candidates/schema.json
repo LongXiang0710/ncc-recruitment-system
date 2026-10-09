@@ -4,8 +4,129 @@
   "description": "集中管理校园招聘与社会招聘人才档案，跟进招聘进度",
   "fields": [
     {
+      "key": "travel_acceptance",
+      "label": "是否接受出差",
+      "section": "一筛情况",
+      "editorRequired": true,
+      "listHidden": true,
+      "options": [
+        "能接受长差",
+        "不能接受长差",
+        "定向",
+        "能接受短差",
+        "未接通-无法了解"
+      ]
+    },
+    {
+      "key": "previous_company_type",
+      "label": "之前公司性质/岗位角色",
+      "editorRequired": true,
+      "listHidden": true,
+      "options": [
+        "业主单位",
+        "管理公司",
+        "监理公司",
+        "化工厂/生产厂",
+        "施工总承包",
+        "分包队",
+        "施工班组",
+        "应届生",
+        "无法界定",
+        "EPC",
+        "未接通-无法了解"
+      ]
+    },
+    {
+      "key": "salary_expectation_k",
+      "label": "上家到手薪资/期望薪资（K）",
+      "type": "number",
+      "min": 0,
+      "max": 1000,
+      "step": 0.1,
+      "editorRequired": true,
+      "listHidden": true
+    },
+    {
+      "key": "contract_type",
+      "label": "期望合同形式",
+      "listHidden": true,
+      "options": [
+        "实习协议",
+        "项目合同",
+        "正式合同",
+        "项目合同+正式合同"
+      ]
+    },
+    {
+      "key": "employment_status",
+      "label": "在职状态",
+      "editorRequired": true,
+      "listHidden": true,
+      "options": [
+        "在职",
+        "离职",
+        "离职交接中",
+        "应届生",
+        "未接通-无法了解"
+      ]
+    },
+    {
+      "key": "availability_note",
+      "label": "到岗意愿档期",
+      "listHidden": true
+    },
+    {
+      "key": "expected_arrival_date",
+      "label": "预计到岗日期",
+      "type": "date",
+      "listHidden": true
+    },
+    {
+      "key": "availability_period",
+      "label": "档期",
+      "listHidden": true,
+      "options": [
+        "1个月内",
+        "1-3个月",
+        "3-6个月",
+        "6-9个月",
+        "9-12个月"
+      ]
+    },
+    {
+      "key": "screening_result",
+      "label": "一筛结果",
+      "editorRequired": true,
+      "listHidden": true,
+      "options": [
+        "可跟进",
+        "排除",
+        "失效",
+        "拒绝",
+        "未接通",
+        "已工作",
+        "观望"
+      ]
+    },
+    {
+      "key": "follow_up_owner",
+      "label": "跟进人",
+      "editorRequired": true,
+      "listHidden": true,
+      "readonly": true
+    },
+    {
+      "key": "screening_reason",
+      "label": "一筛结果理由",
+      "type": "textarea",
+      "fullWidth": true,
+      "editorRequired": true,
+      "listHidden": true
+    },
+    {
       "key": "recruitment_type",
       "label": "招聘类型",
+      "section": "基础信息",
       "options": [
         "校园招聘",
         "社会招聘"
@@ -140,6 +261,7 @@
       "options": [
         "机械工程师",
         "电气工程师",
+        "材料工程师",
         "安全工程师",
         "土建工程师",
         "管道工程师",

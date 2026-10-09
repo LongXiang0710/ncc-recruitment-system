@@ -97,7 +97,7 @@ class ResumeRepository:
             return None
         if field == "linked_candidate":
             value = self._identifier(value)
-            filter_value = {remote: {"id": {"$eq": value}}}
+            filter_value = {remote: {"id": value}}
         else:
             value = str(value or "").strip()
             if not value:
@@ -115,6 +115,6 @@ class ResumeRepository:
         endpoint = f"{self.COLLECTION}:list"
         data = self.client.request(endpoint, params={
             "pageSize": 100,
-            "filter": {"linked_candidate": {"id": {"$eq": candidate_id}}},
+            "filter": {"linked_candidate": {"id": candidate_id}},
         })
         return self._rows(data, endpoint)

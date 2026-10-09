@@ -3,6 +3,7 @@
 import io
 import json
 import unittest
+from unittest import mock
 from urllib.error import HTTPError, URLError
 
 from features.nocobase_sync.config import NocoBaseConfig
@@ -23,6 +24,26 @@ class Response(io.BytesIO):
 
 
 class NocoBaseClientTests(unittest.TestCase):
+    def test_default_urlopen_receives_timeout_as_timeout_not_request_body(self):
+        captured = []
+        with mock.patch(
+            "features.nocobase_sync.client.urlopen",
+            side_effect=lambda request, **kwargs: captured.append((request, kwargs)) or Response(b'{"data":[]}'),
+        ):
+            client = NocoBaseClient(NocoBaseConfig("https://example.test", "token", True))
+            client.request("campus_talent_pool:list")
+        self.assertIsNone(captured[0][0].data)
+        self.assertEqual(captured[0][1], {"timeout": 30})
+
+    def test_swagger_document_accepts_raw_or_wrapped_json(self):
+        responses = [Response(b'{"openapi":"3.0.0"}'), Response(b'{"data":{"openapi":"3.0.0"}}')]
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda _request, _timeout: responses.pop(0),
+        )
+        self.assertEqual(client.request_document("swagger:get"), {"openapi":"3.0.0"})
+        self.assertEqual(client.request_document("swagger:get"), {"openapi":"3.0.0"})
+
     def test_request_builds_api_url_bearer_header_and_json_body(self):
         captured = []
 
@@ -100,6 +121,19 @@ class NocoBaseClientTests(unittest.TestCase):
         with self.assertRaises(NocoBaseError) as raised:
             client.request_envelope("campus_talent_pool:list")
         self.assertEqual(raised.exception.kind, "protocol")
+
+    def test_request_void_accepts_empty_success_response(self):
+        captured = []
+        client = NocoBaseClient(
+            NocoBaseConfig("https://example.test", "token", True),
+            opener=lambda request, timeout: captured.append((request, timeout)) or Response(b""),
+        )
+        self.assertIsNone(client.request_void(
+            "Resume_Collection/1/Resume:set", params={"filterByTks": [2]},
+        ))
+        self.assertEqual(captured[0][0].method, "POST")
+        self.assertIn("filterByTks=%5B2%5D", captured[0][0].full_url)
+        self.assertIsNone(captured[0][0].data)
 
     def test_upload_builds_multipart_and_requires_integer_attachment_id(self):
         captured = []

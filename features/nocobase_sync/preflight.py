@@ -45,6 +45,30 @@ FIELD_TITLES = {
     },
 }
 
+FIELD_IDENTIFIERS = {
+    "Education_Background": {
+        "education": "Education_background",
+        "school_name": "college",
+        "major": "major",
+        "enrollment": "Enrollment_time",
+        "graduation": "Graduation_time",
+    },
+    "Work_experience": {
+        "organization": "workplace",
+        "position": "position",
+        "start_date": "start_time",
+        "end_date": "end_time",
+        "description": "Job_Description",
+    },
+    "Project_Experience": {
+        "project_name": "Project_Name",
+        "role": "role",
+        "start_date": "start",
+        "end_date": "end",
+        "description": "Project_Description",
+    },
+}
+
 DATE_FIELDS = {
     ("Education_Background", "enrollment"),
     ("Education_Background", "graduation"),
@@ -66,7 +90,6 @@ RESUME_FIELDS = MappingProxyType({
     "position": "Job",
     "position_detail": "Other_job_titles",
     "created_by": "Creator",
-    "created_at": "time",
     "source_id": "source_id",
     "file_hash": "file_hash",
     "recognition_result": "recognition_result",
@@ -115,6 +138,10 @@ def _validate_main_schema(schema: dict) -> None:
     properties = schema["properties"]
     if not isinstance(properties.get("id"), dict) or properties["id"].get("type") != "integer":
         raise _protocol()
+    required = set(LOCAL_TO_REMOTE.values()) | {"channel", "Social_recruitment_channels"}
+    if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
+           for key in required):
+        raise _protocol()
 
 
 def _validate_resume_schema(schema: dict) -> Mapping[str, str]:
@@ -124,7 +151,7 @@ def _validate_resume_schema(schema: dict) -> Mapping[str, str]:
     required = {
         "Number", "Processing_Status", "name", "Job_Type",
         "Campus_recruitment_channels", "External_hiring_channels", "Details",
-        "Job", "Other_job_titles", "Creator", "time", "source_id",
+        "Job", "Other_job_titles", "Creator", "source_id",
     }
     if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
            for key in required):
@@ -146,7 +173,8 @@ def _validate_resume_schema(schema: dict) -> Mapping[str, str]:
 
 
 def _document(client: NocoBaseClient, namespace: str) -> tuple[dict, dict]:
-    document = client.request(ENDPOINT, params={"ns": namespace})
+    reader = getattr(client, "request_document", client.request)
+    document = reader(ENDPOINT, params={"ns": namespace})
     if not isinstance(document, dict):
         raise _protocol()
     paths = document.get("paths")
@@ -155,10 +183,22 @@ def _document(client: NocoBaseClient, namespace: str) -> tuple[dict, dict]:
     if not isinstance(paths, dict) or not isinstance(schemas, dict) or not schemas:
         raise _protocol()
     return paths, schemas
-    required = set(LOCAL_TO_REMOTE.values()) | {"channel", "Social_recruitment_channels"}
-    if any(not isinstance(properties.get(key), dict) or properties[key].get("type") != "string"
-           for key in required):
-        raise _protocol()
+
+
+def _relation_schema(schemas: dict, relation: str) -> dict:
+    """Resolve both legacy per-relation schemas and NocoBase's shared schemas."""
+    try:
+        return _schema(schemas, f"campus_talent_pool.{relation}")
+    except NocoBaseError:
+        fallback = "attachments" if relation == "biographical_notes" else "Talent_Pool_Subtable"
+        return _schema(schemas, fallback)
+
+
+def _resume_attachment_schema(schemas: dict) -> dict:
+    try:
+        return _schema(schemas, "Resume_Collection.Resume")
+    except NocoBaseError:
+        return _schema(schemas, "attachments")
 
 
 def _resolve_fields(relation: str, schema: dict) -> Mapping[str, str]:
@@ -170,10 +210,15 @@ def _resolve_fields(relation: str, schema: dict) -> Mapping[str, str]:
 
     resolved = {}
     for local_key, title in FIELD_TITLES[relation].items():
-        matches = by_title.get(title, [])
-        if len(matches) != 1:
-            raise _protocol()
-        remote_key, definition = matches[0]
+        preferred = FIELD_IDENTIFIERS[relation][local_key]
+        definition = properties.get(preferred)
+        if isinstance(definition, dict):
+            remote_key = preferred
+        else:
+            matches = by_title.get(title, [])
+            if len(matches) != 1:
+                raise _protocol()
+            remote_key, definition = matches[0]
         if definition.get("type") != "string":
             raise _protocol()
         if (relation, local_key) in DATE_FIELDS and definition.get("format") not in ALLOWED_DATE_FORMATS:
@@ -192,7 +237,7 @@ def run_preflight(client: NocoBaseClient) -> PreflightReport:
 
     relation_schemas = {}
     for relation, expected_type in RELATIONS.items():
-        relation_schema = _schema(schemas, f"campus_talent_pool.{relation}")
+        relation_schema = _relation_schema(schemas, relation)
         if relation_schema.get("x-association-type") not in (None, expected_type):
             raise _protocol()
         relation_schemas[relation] = relation_schema
@@ -217,7 +262,7 @@ def run_preflight(client: NocoBaseClient) -> PreflightReport:
     for action in ("list", "get", "create", "update", "updateOrCreate", "destroy"):
         method = "get" if action in ("list", "get") else "post"
         _operation(resume_paths, f"/Resume_Collection:{action}", method)
-    resume_relation = _schema(resume_schemas, "Resume_Collection.Resume")
+    resume_relation = _resume_attachment_schema(resume_schemas)
     if resume_relation.get("x-association-type") not in (None, "belongsToMany"):
         raise _protocol()
     for action in ("list", "get", "create", "update", "destroy", "set", "remove", "toggle"):

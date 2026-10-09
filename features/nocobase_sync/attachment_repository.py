@@ -62,11 +62,26 @@ class AttachmentRepository:
         return filename, file_types.mime_type(filename), content
 
     def _set(self, candidate_id: int, values: list[int]) -> None:
-        self.client.request(
-            f"campus_talent_pool/{candidate_id}/biographical_notes:set",
-            method="POST",
-            body={"values": values},
+        execute = getattr(self.client, "request_void", None)
+        if execute is None:
+            self.client.request(
+                f"campus_talent_pool/{candidate_id}/biographical_notes:set",
+                method="POST", params={"filterByTks": values},
+            )
+            return
+        desired = set(values)
+        execute(
+            "campus_talent_pool:update", method="POST",
+            params={"filterByTk": candidate_id},
+            body={
+                "biographical_notes": [
+                    {"id": attachment_id} for attachment_id in sorted(desired)
+                ]
+            },
         )
+        confirmed = {row["id"] for row in self.list(candidate_id)}
+        if confirmed != desired:
+            raise self._protocol("campus_talent_pool:update")
 
     def replace(self, candidate_id: int, upload: dict | None = None,
                 remove: bool = False) -> list[dict]:
@@ -153,7 +168,7 @@ class AttachmentRepository:
         ):
             references = self.client.request(endpoint, params={
                 "pageSize": 1,
-                "filter": {relation: {"id": {"$eq": attachment_id}}},
+                "filter": {relation: {"id": attachment_id}},
             })
             if not isinstance(references, list):
                 raise self._protocol(endpoint)

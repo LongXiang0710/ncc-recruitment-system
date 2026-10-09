@@ -153,7 +153,7 @@ class NocoBasePreflightTests(unittest.TestCase):
             "recruitment_type": "Job_Type", "campus_channel": "Campus_recruitment_channels",
             "social_channel": "External_hiring_channels", "channel_detail": "Details",
             "position": "Job", "position_detail": "Other_job_titles", "created_by": "Creator",
-            "created_at": "time", "source_id": "source_id", "file_hash": "file_hash",
+            "source_id": "source_id", "file_hash": "file_hash",
             "recognition_result": "recognition_result", "linked_candidate": "linked_candidate",
         })
         self.assertEqual(client.calls, [

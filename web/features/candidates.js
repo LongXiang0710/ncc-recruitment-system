@@ -19,10 +19,13 @@ function bindCandidateDates(form) {
   birth?.addEventListener('input',calculate);graduation?.addEventListener('input',calculate);type?.addEventListener('change',calculate);educationEditor?.addEventListener('educationchange',calculate);calculate();
 }
 
-function prepareCandidateEditor({formFields,formRow}) {
+function prepareCandidateEditor({formFields,formRow,row,user,resumeSource}) {
+  const visibleFields=formFields.filter(field=>!['graduation','cohort'].includes(field.key));
+  const isResumeImport=Boolean(resumeSource);
+  const owner=isResumeImport?'':String(user?.nickname || user?.username || '').trim();
   return {
-    formFields: formFields.filter(field=>!['graduation','cohort'].includes(field.key)),
-    formRow,
+    formFields: visibleFields.map(field=>field.editorRequired?{...field,required:!isResumeImport}:field),
+    formRow: owner?{...formRow,follow_up_owner:owner}:formRow,
   };
 }
 
